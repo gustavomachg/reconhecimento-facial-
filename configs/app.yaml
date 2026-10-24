@@ -1,0 +1,28 @@
+# Configuração da aplicação (Parte 2). Atualize com a configuração vencedora da Parte 1.
+device: auto
+
+model:
+  name: facenet                 # facenet | arcface (vencedor de E01–E05, ver ADR-001)
+  # path: checkpoints/public/buffalo_l/w600k_r50.onnx   # se arcface
+  # checkpoint: checkpoints/finetuned/E04.pt            # se facenet fine-tunada
+
+detection:
+  prob_threshold: 0.95          # confiança mínima do MTCNN para contar como face
+  min_face_px: 60               # menor lado da caixa da face (px); abaixo disso -> LowQualityImage
+  blur_threshold: 15.0          # variância do Laplaciano do recorte; abaixo -> LowQualityImage
+
+recognition:
+  matcher: prototype            # vencedor do E06
+  matcher_kwargs: {}
+  threshold: 0.55               # PROVISÓRIO — substituir pelo valor do E07 (ADR-003)
+  duplicate_threshold: 0.75     # cosseno; cadastro com similaridade >= isto é recusado
+  consistency_threshold: 0.40   # menor cosseno entre duas fotos do próprio cadastro
+  max_enroll_images: 10
+
+storage:
+  db_path: embeddings/facerec.db   # ignorado pelo git
+  store_photos: false              # minimização (LGPD): por padrão NÃO guarda fotos
+  photos_dir: faces/               # usado só se store_photos = true (ignorado pelo git)
+
+logging:
+  level: INFO

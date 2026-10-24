@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reconhecedor Facial</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1d2330; --muted:#667085; --ok:#12805c; --bad:#b42318; --accent:#2f5bd3; --line:#e4e7ec; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12151b; --card:#1b2029; --fg:#e8eaee; --muted:#98a2b3; --line:#2c3340; --accent:#7b9cff; --ok:#3ccf91; --bad:#ff7a6e; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:16px 20px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:1.25rem; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:.9rem; }
+  main { display:grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1fr); gap:16px; padding:16px 20px; max-width:1200px; margin:auto; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; padding:16px; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  h2 { font-size:1rem; margin:0 0 12px; }
+  video, canvas { width:100%; border-radius:8px; background:#000; aspect-ratio:4/3; object-fit:cover; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+  button { border:1px solid var(--line); background:var(--card); color:var(--fg); padding:8px 12px; border-radius:8px; cursor:pointer; font:inherit; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button.danger { color:var(--bad); }
+  button:disabled { opacity:.5; cursor:default; }
+  input[type=text] { flex:1; min-width:160px; padding:8px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--fg); font:inherit; }
+  #result { font-size:1.15rem; font-weight:600; margin-top:12px; min-height:1.6em; }
+  #result.ok { color:var(--ok); } #result.bad { color:var(--bad); }
+  .thumbs { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .thumbs img { width:56px; height:56px; object-fit:cover; border-radius:6px; }
+  ul { list-style:none; padding:0; margin:0; }
+  li { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); gap:8px; }
+  li small { color:var(--muted); }
+  .muted { color:var(--muted); }
+  .notice { font-size:.8rem; color:var(--muted); margin-top:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Reconhecedor Facial</h1>
+  <p>Processamento 100% local. Imagens não são enviadas para nenhum serviço externo.</p>
+</header>
+<main>
+  <section class="card">
+    <h2>Câmera</h2>
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas" hidden></canvas>
+    <div class="row">
+      <button id="btnStart">Ligar câmera</button>
+      <button id="btnRecognize" class="primary" disabled>Reconhecer</button>
+      <label class="muted">ou arquivo: <input id="fileRecognize" type="file" accept="image/*"></label>
+    </div>
+    <div id="result" aria-live="polite"></div>
+  </section>
+
+  <section class="card">
+    <h2>Cadastro</h2>
+    <div class="row">
+      <input id="name" type="text" placeholder="Nome da pessoa">
+    </div>
+    <div class="row">
+      <button id="btnCapture" disabled>Capturar foto da câmera</button>
+      <label class="muted">ou arquivos: <input id="fileEnroll" type="file" accept="image/*" multiple></label>
+    </div>
+    <div class="thumbs" id="thumbs"></div>
+    <div class="row">
+      <button id="btnEnroll" class="primary">Cadastrar</button>
+      <button id="btnClear">Limpar fotos</button>
+    </div>
+    <div id="enrollMsg" class="muted" aria-live="polite"></div>
+
+    <h2 style="margin-top:20px">Pessoas cadastradas</h2>
+    <p id="personsMsg" class="muted"></p>
+    <ul id="persons"></ul>
+    <p class="notice">Excluir remove o cadastro, todos os embeddings e qualquer foto armazenada.</p>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const video = $("video"), canvas = $("canvas");
+let captured = [];
+
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    video.srcObject = stream;
+    $("btnRecognize").disabled = false; $("btnCapture").disabled = false;
+  } catch (e) { showResult("Não foi possível acessar a câmera: " + e.message, false); }
+}
+
+function frameBlob() {
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  return new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.92));
+}
+
+function showResult(text, ok) {
+  const el = $("result"); el.textContent = text;
+  el.className = ok === undefined ? "" : (ok ? "ok" : "bad");
+}
+
+async function recognize(blob) {
+  const fd = new FormData(); fd.append("file", blob, "frame.jpg");
+  showResult("Reconhecendo…");
+  const r = await fetch("/api/recognize", { method: "POST", body: fd });
+  const data = await r.json();
+  // mostra score x threshold para entender por que foi aceito/rejeitado
+  const detail = (r.ok && data.score !== null && data.score !== undefined)
+    ? ` — score ${data.score.toFixed(3)} / threshold ${data.threshold.toFixed(3)}` : "";
+  showResult(data.message + detail, r.ok && data.recognized);
+}
+
+function renderThumbs() {
+  $("thumbs").innerHTML = "";
+  captured.forEach((b) => { const img = document.createElement("img"); img.src = URL.createObjectURL(b); $("thumbs").appendChild(img); });
+}
+
+async function enroll() {
+  const name = $("name").value.trim();
+  const files = [...captured, ...$("fileEnroll").files];
+  if (!name || files.length === 0) { $("enrollMsg").textContent = "Informe o nome e ao menos uma foto."; return; }
+  const fd = new FormData(); fd.append("name", name);
+  files.forEach((f, i) => fd.append("files", f, f.name || `captura_${i}.jpg`));
+  $("enrollMsg").textContent = "Cadastrando…";
+  const r = await fetch("/api/persons", { method: "POST", body: fd });
+  const data = await r.json();
+  $("enrollMsg").textContent = data.message;
+  if (r.ok) { captured = []; renderThumbs(); $("fileEnroll").value = ""; $("name").value = ""; loadPersons(); }
+}
+
+async function loadPersons() {
+  const r = await fetch("/api/persons"); const data = await r.json();
+  $("personsMsg").textContent = data.message;
+  const ul = $("persons"); ul.innerHTML = "";
+  data.persons.forEach((p) => {
+    const li = document.createElement("li");
+    const info = document.createElement("span");
+    info.innerHTML = `<strong></strong><br><small>${p.n_embeddings} embedding(s)</small>`;
+    info.querySelector("strong").textContent = p.name;
+    const del = document.createElement("button"); del.className = "danger"; del.textContent = "Excluir";
+    del.onclick = async () => {
+      if (!confirm(`Excluir ${p.name} e todos os dados associados?`)) return;
+      const res = await fetch(`/api/persons/${p.id}`, { method: "DELETE" });
+      if (res.ok) loadPersons();
+    };
+    li.append(info, del); ul.appendChild(li);
+  });
+}
+
+$("btnStart").onclick = startCamera;
+$("btnRecognize").onclick = async () => recognize(await frameBlob());
+$("fileRecognize").onchange = (e) => { if (e.target.files[0]) recognize(e.target.files[0]); };
+$("btnCapture").onclick = async () => { captured.push(await frameBlob()); renderThumbs(); };
+$("btnClear").onclick = () => { captured = []; renderThumbs(); };
+$("btnEnroll").onclick = enroll;
+loadPersons();
+</script>
+</body>
+</html>
