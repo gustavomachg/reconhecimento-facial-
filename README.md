@@ -1,5 +1,7 @@
 # Reconhecedor Facial — Trabalho de IA (UFMS)
 
+[![CI](https://github.com/gustavomachg/reconhecimento-facial-/actions/workflows/ci.yml/badge.svg)](https://github.com/gustavomachg/reconhecimento-facial-/actions/workflows/ci.yml)
+
 Sistema de reconhecimento facial em duas partes:
 
 1. **Experimentação** — comparar modelos (FaceNet × ArcFace), estratégias de fine-tuning
