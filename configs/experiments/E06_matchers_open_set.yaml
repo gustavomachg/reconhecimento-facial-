@@ -1,0 +1,35 @@
+# E06 — Comparadores no dataset privado (open-set), avaliados na VALIDAÇÃO
+# Preencha `model` com o vencedor de E01–E05 (critério: menor EER na validação privada).
+experiment:
+  id: E06
+  name: matchers_open_set
+  strategy: open-set
+  hypothesis: >-
+    Com embeddings L2-normalizados, cosseno e euclidiana empatam (mesmo ranking);
+    protótipos e k-NN ficam mais robustos com várias fotos por pessoa; SVM sofre com poucas
+    amostras por classe e não modela "desconhecido" naturalmente.
+seed: 42
+device: auto
+
+model:
+  name: facenet            # trocar pelo vencedor (ex.: arcface)
+  # checkpoint: checkpoints/finetuned/E04.pt   # se o vencedor for um modelo fine-tunado
+
+private:
+  aligned_root: data/private/aligned_facenet   # aligned_arcface se o modelo for arcface
+  gallery_sessions: [s1]
+  val_sessions: [s2]
+  test_sessions: [s3]
+  n_unknown_val: 1
+  n_unknown_test: 1
+
+threshold_strategy: eer
+matchers:
+  - {name: cosine}
+  - {name: euclidean}
+  - {name: prototype}
+  - {name: knn, k: 3}
+  - {name: svm, C: 1.0}
+
+output:
+  results_dir: experiments/results/E06

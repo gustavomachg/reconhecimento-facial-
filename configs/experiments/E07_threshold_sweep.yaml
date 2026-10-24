@@ -1,0 +1,28 @@
+# E07 — Configuração final: varredura de threshold na VALIDAÇÃO e avaliação ÚNICA no TESTE
+experiment:
+  id: E07
+  name: threshold_sweep
+  strategy: threshold
+  hypothesis: >-
+    Existe um threshold que equilibra aceitar desconhecidos (FAR) e rejeitar conhecidos (FRR);
+    escolhido na validação, ele se mantém no teste.
+seed: 42
+device: auto
+
+model:
+  name: facenet            # = modelo do E06
+private:
+  aligned_root: data/private/aligned_facenet
+  gallery_sessions: [s1]
+  val_sessions: [s2]
+  test_sessions: [s3]
+  n_unknown_val: 1
+  n_unknown_test: 1
+
+matcher: {name: prototype}  # = melhor comparador do E06
+threshold:
+  strategy: eer             # eer | far_target | max_f1 | max_accuracy
+  far_target: 0.01          # usado quando strategy = far_target
+
+output:
+  results_dir: experiments/results/E07

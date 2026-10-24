@@ -1,0 +1,38 @@
+# E08 — ArcFace com backbone MobileFaceNet (insightface buffalo_s / WebFace600K), cosseno
+# Licença dos pesos: uso NÃO comercial / acadêmico.
+experiment:
+  id: E08
+  name: mobilefacenet_pretrained
+  strategy: pretrained
+  hypothesis: >-
+    Um backbone leve (MobileFaceNet, ~poucos milhões de parâmetros) treinado com a mesma
+    ArcFace loss e os mesmos dados do E02 perde pouco desempenho e é bem mais rápido
+    (relação custo computacional x desempenho).
+seed: 42
+device: auto
+
+model:
+  name: arcface
+  path: checkpoints/public/buffalo_s/w600k_mbf.onnx
+
+training:
+  strategy: none
+
+evaluation:
+  lfw:
+    root: data/public/aligned_arcface/lfw
+    pairs: data/public/aligned_arcface/lfw/pairs.txt
+  lfw_strategy: max_accuracy   # threshold de cada fold escolhido nos outros 9 folds
+  private:
+    enabled: true
+    aligned_root: data/private/aligned_arcface
+    gallery_sessions: [s1]
+    val_sessions: [s2]
+    test_sessions: [s3]
+    n_unknown_val: 1
+    n_unknown_test: 1
+    n_pairs: 2000
+
+
+output:
+  results_dir: experiments/results/E08

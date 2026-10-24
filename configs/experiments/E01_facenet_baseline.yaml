@@ -1,0 +1,36 @@
+# E01 — Baseline: FaceNet pré-treinada (VGGFace2), sem fine-tuning, comparação por cosseno
+experiment:
+  id: E01
+  name: facenet_baseline
+  strategy: pretrained
+  hypothesis: >-
+    Baseline. Uma InceptionResnetV1 treinada no VGGFace2 já gera embeddings separáveis
+    o suficiente para verificação em LFW e no dataset privado.
+seed: 42
+device: auto
+
+model:
+  name: facenet
+  pretrained: vggface2
+
+training:
+  strategy: none
+
+evaluation:
+  lfw:
+    root: data/public/aligned_facenet/lfw
+    pairs: data/public/aligned_facenet/lfw/pairs.txt
+  lfw_strategy: max_accuracy   # threshold de cada fold escolhido nos outros 9 folds
+  private:
+    enabled: true
+    aligned_root: data/private/aligned_facenet
+    gallery_sessions: [s1]
+    val_sessions: [s2]
+    test_sessions: [s3]
+    n_unknown_val: 1
+    n_unknown_test: 1
+    n_pairs: 2000
+
+
+output:
+  results_dir: experiments/results/E01

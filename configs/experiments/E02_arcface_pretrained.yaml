@@ -1,0 +1,37 @@
+# E02 — ArcFace (insightface, iResNet-50 / WebFace600K) pré-treinado, cosseno
+# Licença dos pesos: uso NÃO comercial / acadêmico.
+experiment:
+  id: E02
+  name: arcface_pretrained
+  strategy: pretrained
+  hypothesis: >-
+    A margem angular aditiva (ArcFace) gera embeddings mais compactos por identidade e
+    mais separados entre identidades que o E01, reduzindo o EER.
+seed: 42
+device: auto
+
+model:
+  name: arcface
+  path: checkpoints/public/buffalo_l/w600k_r50.onnx
+
+training:
+  strategy: none
+
+evaluation:
+  lfw:
+    root: data/public/aligned_arcface/lfw
+    pairs: data/public/aligned_arcface/lfw/pairs.txt
+  lfw_strategy: max_accuracy   # threshold de cada fold escolhido nos outros 9 folds
+  private:
+    enabled: true
+    aligned_root: data/private/aligned_arcface
+    gallery_sessions: [s1]
+    val_sessions: [s2]
+    test_sessions: [s3]
+    n_unknown_val: 1
+    n_unknown_test: 1
+    n_pairs: 2000
+
+
+output:
+  results_dir: experiments/results/E02
