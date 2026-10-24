@@ -1,0 +1,25 @@
+# Ambiente de referência: Python 3.11 (Windows/Linux), CUDA opcional.
+# Versões fixadas para reprodutibilidade. facenet-pytorch 2.6.0 restringe torch<=2.3 e numpy<2.
+# Para GPU, instale torch/torchvision pelo índice oficial antes deste arquivo, ex.:
+#   pip install torch==2.2.2 torchvision==0.17.2 --index-url https://download.pytorch.org/whl/cu121
+torch==2.2.2
+torchvision==0.17.2
+facenet-pytorch==2.6.0
+numpy==1.26.4
+Pillow==10.2.0
+onnxruntime==1.17.3
+onnx==1.16.0
+scikit-learn==1.4.2
+scipy==1.13.0
+pandas==2.2.2
+matplotlib==3.8.4
+PyYAML==6.0.1
+tqdm==4.66.4
+requests==2.31.0
+fastapi==0.111.0
+uvicorn==0.29.0
+python-multipart==0.0.9
+httpx==0.27.0
+pytest==8.2.0
+ruff==0.4.4
+pre-commit==3.7.1
