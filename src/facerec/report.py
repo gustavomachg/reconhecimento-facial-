@@ -26,6 +26,15 @@ def collect() -> dict[str, dict]:
     return out
 
 
+def display_model(r: dict) -> str:
+    """Nome legível: o MobileFaceNet roda pelo mesmo carregador ONNX do ArcFace."""
+    raw = r.get("model") if isinstance(r.get("model"), str) else r.get("model", {}).get("name")
+    exp_name = r.get("experiment", {}).get("name", "")
+    if "mobilefacenet" in exp_name:
+        return "MobileFaceNet (ArcFace loss)"
+    return {"facenet": "FaceNet (VGGFace2)", "arcface": "ArcFace iResNet-50"}.get(raw, raw)
+
+
 def table(results: dict[str, dict]) -> str:
     lines = [
         "| Experimento | Modelo | Estratégia | Dataset | Accuracy | F1 | EER | Observação |",
@@ -33,9 +42,7 @@ def table(results: dict[str, dict]) -> str:
     ]
     for exp_id, r in results.items():
         e = r.get("experiment", {})
-        model = (
-            r.get("model") if isinstance(r.get("model"), str) else r.get("model", {}).get("name")
-        )
+        model = display_model(r)
         strategy = e.get("strategy", "")
         if "lfw" in r:
             lfw = r["lfw"]
@@ -74,6 +81,8 @@ def roc_comparison(results: dict[str, dict], key: str = "lfw") -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    if not any(key in r and "roc_curve" in r[key] for r in results.values()):
+        return  # nenhum experimento avaliado nesse conjunto: não gera gráfico vazio
     fig, ax = plt.subplots(figsize=(6, 6))
     for exp_id, r in results.items():
         if key in r and "roc_curve" in r[key]:

@@ -125,6 +125,29 @@ def crop_with_margin(img: Image.Image, box: np.ndarray, size: int = 160, margin:
     return np.asarray(crop, dtype=np.uint8)
 
 
+def pick_face(faces: list[DetectedFace], image_size: tuple[int, int], strategy: str = "largest"):
+    """Escolhe UMA face quando a imagem tem várias.
+
+    - "largest": a maior face (pessoa mais próxima da câmera) — usada na pasta do grupo;
+    - "center":  a face cujo centro está mais perto do centro da imagem. É o critério certo
+                 para LFW e CelebA, cujas imagens foram montadas CENTRALIZADAS na pessoa
+                 rotulada; a maior face pode ser de outra pessoa ao lado.
+    """
+    if not faces:
+        return None
+    if strategy == "largest":
+        return max(faces, key=lambda f: f.size)
+    if strategy == "center":
+        cx, cy = image_size[0] / 2, image_size[1] / 2
+
+        def dist(f: DetectedFace) -> float:
+            x1, y1, x2, y2 = f.box
+            return float(((x1 + x2) / 2 - cx) ** 2 + ((y1 + y2) / 2 - cy) ** 2)
+
+        return min(faces, key=dist)
+    raise ValueError(f"Estratégia de escolha de face desconhecida: {strategy}")
+
+
 # ---------------------------------------------------------------- detector
 class FaceDetector:
     def __init__(

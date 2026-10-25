@@ -110,3 +110,14 @@ def test_laplacian_variance_lower_when_blurred():
     sharp = np.asarray(noisy_image())
     blurred = np.asarray(noisy_image(blur=4))
     assert laplacian_variance(blurred) < laplacian_variance(sharp)
+
+
+def test_pick_face_center_vs_largest():
+    from facerec.detection import DetectedFace, pick_face
+
+    central = DetectedFace(np.array([100, 100, 150, 150.0]), 0.99, None)  # pequena, no centro
+    big_side = DetectedFace(np.array([0, 0, 90, 90.0]), 0.99, None)  # maior, no canto
+    faces = [big_side, central]
+    assert pick_face(faces, (250, 250), "center") is central
+    assert pick_face(faces, (250, 250), "largest") is big_side
+    assert pick_face([], (250, 250), "center") is None
