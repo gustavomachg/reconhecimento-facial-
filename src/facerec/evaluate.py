@@ -179,16 +179,22 @@ def private_validation_pairs(cfg: dict, seed: int) -> list[tuple] | None:
     return make_verification_pairs(split["gallery"] + split["val"], pcfg.get("n_pairs", 2000), seed)
 
 
-def evaluate(config_path: str) -> dict:
+def evaluate(config_path: str, which: str = "best") -> dict:
+    """which = "best" (checkpoint escolhido na validação) ou "last" (última época treinada)."""
     cfg = load_yaml(config_path)
     seed = cfg.get("seed", 42)
     set_seed(seed)
     device = pick_device(cfg.get("device", "auto"))
     model_cfg = dict(cfg["model"])
     if cfg.get("training", {}).get("strategy", "none") != "none":
-        model_cfg["checkpoint"] = str(resolve_path(cfg["output"]["checkpoint"]))
+        ckpt = resolve_path(cfg["output"]["checkpoint"])
+        if which == "last":
+            ckpt = ckpt.with_name(ckpt.stem + "_last" + ckpt.suffix)
+        model_cfg["checkpoint"] = str(ckpt)
     embedder = build_embedder(model_cfg, device)
     out_dir = resolve_path(cfg["output"]["results_dir"])
+    if which == "last":
+        out_dir = out_dir / "ultima_epoca"
     out_dir.mkdir(parents=True, exist_ok=True)
     ev = cfg.get("evaluation", {})
     results: dict = {"experiment": cfg["experiment"], "model": model_cfg.get("name")}
@@ -227,8 +233,14 @@ def evaluate(config_path: str) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Avaliação LFW 10-fold + validação privada")
     ap.add_argument("--config", required=True)
+    ap.add_argument(
+        "--checkpoint",
+        choices=["best", "last"],
+        default="best",
+        help="best = escolhido na validação; last = última época (resultados em ultima_epoca/)",
+    )
     args = ap.parse_args()
-    r = evaluate(args.config)
+    r = evaluate(args.config, args.checkpoint)
     short = {k: v for k, v in r.items() if k != "environment"}
     for part in ("lfw", "private_val"):
         if part in short:

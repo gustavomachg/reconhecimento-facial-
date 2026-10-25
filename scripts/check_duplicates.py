@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from facerec.config import load_yaml, resolve_path  # noqa: E402
 from facerec.data.datasets import list_identity_folder, list_private  # noqa: E402
-from facerec.data.dedup import find_cross_duplicates  # noqa: E402
+from facerec.data.dedup import MAX_DISTANCE, find_cross_duplicates  # noqa: E402
 from facerec.data.splits import (  # noqa: E402
     filter_records,
     split_by_identity,
@@ -33,7 +33,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--dataset", choices=["celeba", "private"], required=True)
     ap.add_argument("--config", required=True)
-    ap.add_argument("--max-distance", type=int, default=4)
+    ap.add_argument("--max-distance", type=int, default=MAX_DISTANCE)
     ap.add_argument("--exclude-out", action="store_true")
     args = ap.parse_args()
     cfg = load_yaml(args.config)
@@ -41,7 +41,13 @@ def main() -> None:
 
     if args.dataset == "celeba":
         d = cfg["data"]
-        recs = list_identity_folder(resolve_path(d["aligned_root"]))
+        from facerec.train import apply_exclusions
+
+        # mesmo split do treino: aplica a exclusão de identidades (sobreposição com o LFW)
+        recs = apply_exclusions(
+            list_identity_folder(resolve_path(d["aligned_root"])),
+            {"exclude_identities_file": d.get("exclude_identities_file")},
+        )
         split = split_by_identity(
             [r.identity for r in recs],
             d.get("val_fraction", 0.15),

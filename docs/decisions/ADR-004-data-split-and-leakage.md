@@ -26,7 +26,8 @@
 
 ### Regras gerais
 - **Augmentation** só no conjunto de treino e só depois do split (`build_transforms(train=True)`).
-- **Quase-duplicatas**: `scripts/check_duplicates.py` (dHash, Hamming ≤ 4) entre conjuntos do
+- **Quase-duplicatas**: `scripts/check_duplicates.py` (dHash de 256 bits, Hamming ≤ 16 — calibrado:
+  pessoas diferentes ≥ 30, cópia real ≤ 9; com 64 bits havia milhares de falsos positivos) entre conjuntos do
   mesmo split; a cópia do conjunto de avaliação vai para uma lista de exclusão.
 - **Seleção de modelo** (E01–E05) por EER na **validação** privada; **comparador** (E06) na
   validação; **threshold** (E07) na validação. O **teste** privado é avaliado uma única vez (E07).

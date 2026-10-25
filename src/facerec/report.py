@@ -23,6 +23,9 @@ def collect() -> dict[str, dict]:
     out = {}
     for f in sorted(RESULTS.glob("E0*/metrics.json")):
         out[f.parent.name] = json.loads(f.read_text(encoding="utf-8"))
+        last = f.parent / "ultima_epoca" / "metrics.json"  # modelo da última época (fine-tuning)
+        if last.exists():
+            out[f"{f.parent.name} (última época)"] = json.loads(last.read_text(encoding="utf-8"))
     return out
 
 

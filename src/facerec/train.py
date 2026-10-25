@@ -179,6 +179,9 @@ def train(config_path: str) -> dict:
         raise ValueError(f"Optimizer desconhecido: {opt_name}")
     epochs = int(tr["epochs"])
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    # precisão mista (AMP) na GPU: ~metade da memória e mais rápido; a loss fica em float32
+    use_amp = device.startswith("cuda") and tr.get("amp", True)
+    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 
     nw = data_cfg.get("num_workers", 0)
     if loss_cfg["name"] == "triplet":
@@ -206,6 +209,7 @@ def train(config_path: str) -> dict:
     # o checkpoint final é o próprio pré-treinado (e isso é registrado em best_epoch=0)
     best_eer, best_epoch = base["val_eer"], 0
     torch.save({"model": model.state_dict(), "epoch": 0}, ckpt_path)
+    last_path = ckpt_path.with_name(ckpt_path.stem + "_last" + ckpt_path.suffix)
     t0 = time.time()
     for epoch in range(1, epochs + 1):
         set_train_mode(model, trainable)
@@ -213,10 +217,13 @@ def train(config_path: str) -> dict:
         losses = []
         for x, y in loader:
             x, y = x.to(device), y.to(device)
-            loss = criterion(model(x), y)
+            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=use_amp):
+                emb = model(x)
+            loss = criterion(emb.float(), y)
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
             losses.append(loss.item())
         scheduler.step()
         val = validate(model, val_ds, val_pairs, device, nw)
@@ -228,6 +235,9 @@ def train(config_path: str) -> dict:
         }
         history.append(row)
         print(f"[época {epoch}] {row}")
+        # checkpoint da ÚLTIMA época: permite medir no benchmark o efeito do treino mesmo
+        # quando o early stopping fica com o pré-treinado (análise de overfitting)
+        torch.save({"model": model.state_dict(), "epoch": epoch}, last_path)
         if val["val_eer"] < best_eer:
             best_eer, best_epoch, bad_epochs = val["val_eer"], epoch, 0
             torch.save({"model": model.state_dict(), "epoch": epoch}, ckpt_path)
@@ -254,6 +264,8 @@ def train(config_path: str) -> dict:
         "best_epoch": best_epoch,
         "pretrained_val_eer": base["val_eer"],
         "train_time_s": round(time.time() - t0, 1),
+        "device": device,
+        "amp": use_amp,
         "history": history,
         "environment": environment_info(),
     }

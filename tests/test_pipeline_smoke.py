@@ -179,6 +179,7 @@ def test_training_runs_end_to_end(tmp_path, cfg_name):
     assert s["best_epoch"] in (0, 1)
     assert 0 < s["n_trainable_parameters"] < s["n_parameters"]  # parcial: parte congelada
     assert (tmp_path / "ck.pt").exists()
+    assert (tmp_path / "ck_last.pt").exists()  # última época, para análise de overfitting
     for f in ("train_summary.json", "loss_curves.png", "split.json", "config_used.yaml"):
         assert (tmp_path / "out" / f).exists(), f
     split = json.loads((tmp_path / "out" / "split.json").read_text(encoding="utf-8"))

@@ -109,8 +109,8 @@ def test_dhash_near_duplicates(tmp_path):
     a = synthetic_image(0)
     a_resized = a.resize((100, 100)).filter(ImageFilter.GaussianBlur(0.5))
     b = synthetic_image(1)
-    assert hamming(dhash(a), dhash(a_resized)) <= 4
-    assert hamming(dhash(a), dhash(b)) > 10
+    assert hamming(dhash(a), dhash(a_resized)) <= 16  # limite padrão (256 bits)
+    assert hamming(dhash(a), dhash(b)) > 30
 
     paths = {}
     for name, img in {"a": a, "a2": a_resized, "b": b}.items():
