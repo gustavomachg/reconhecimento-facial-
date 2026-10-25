@@ -39,8 +39,10 @@ diferença de resultado possa ser atribuída a esse fator.
 - **Estratégia:** sem treino; comparação por cosseno.
 - **Hiperparâmetros:** threshold por fold escolhido nos outros 9 (máx. acurácia).
 - **Comando:** `python -m facerec.evaluate --config configs/experiments/E01_facenet_baseline.yaml`
-- **Resultado:** _a preencher (`experiments/results/E01/metrics.json`)_
-- **Interpretação:** _a preencher_
+- **Resultado (LFW):** acurácia 99,10% ± 0,43; F1 99,10%; ROC-AUC 0,9991; EER 0,93%;
+  FAR 0,97% / FRR 0,83%; 61,7 ms/face em CPU; 23,5 M parâmetros (`experiments/results/E01/`).
+- **Interpretação:** baseline forte; os erros se dividem entre falsos aceites (29) e falsos
+  rejeites (25). Na 1ª execução (escolhendo o maior rosto) deu 95,90% — ver ablação no README.
 
 ## E02 — ArcFace pré-treinado (iResNet-50)
 - **Hipótese:** a margem angular aditiva gera embeddings mais compactos por identidade e mais
@@ -50,8 +52,11 @@ diferença de resultado possa ser atribuída a esse fator.
 - **Modelo:** iResNet-50 (insightface `buffalo_l`, WebFace600K), 112×112, alinhamento de 5 pontos.
 - **Estratégia:** sem treino; cosseno.
 - **Comando:** `python -m facerec.evaluate --config configs/experiments/E02_arcface_pretrained.yaml`
-- **Resultado:** _a preencher_
-- **Interpretação:** _a preencher_
+- **Resultado (LFW):** acurácia 99,85% ± 0,20; F1 99,85%; ROC-AUC 0,9995; EER 0,30%;
+  FAR 0,00% / FRR 0,30%; 90,3 ms/face; 43,6 M parâmetros.
+- **Interpretação:** hipótese confirmada — EER ~3× menor que o E01 e nenhum falso aceite em 3000
+  pares de pessoas diferentes. Parte do ganho também vem do pré-treino (WebFace600K) e do
+  alinhamento por 5 pontos, não só da loss.
 
 ## E03 — FaceNet, fine-tuning parcial + Triplet Loss
 - **Hipótese:** treinar só os últimos blocos adapta a rede ao domínio sem overfitting.
@@ -110,5 +115,7 @@ diferença de resultado possa ser atribuída a esse fator.
   alinhadas do E02 (`aligned_arcface`).
 - **Comando:** `python scripts/download_arcface.py --pack buffalo_s` e
   `python -m facerec.evaluate --config configs/experiments/E08_mobilefacenet_pretrained.yaml`
-- **Resultado:** _a preencher (comparar EER × `n_parameters` × `inference_ms_per_face` com o E02)_
-- **Interpretação:** _a preencher_
+- **Resultado (LFW):** acurácia 99,67% ± 0,20; F1 99,67%; ROC-AUC 0,9993; EER 0,32%;
+  FAR 0,27% / FRR 0,40%; **5,0 ms/face**; **3,4 M parâmetros**.
+- **Interpretação:** hipótese confirmada — perde 0,18 ponto de acurácia em relação ao E02 (dentro
+  do desvio entre folds), sendo ~18× mais rápido e ~13× menor. Melhor custo × desempenho.

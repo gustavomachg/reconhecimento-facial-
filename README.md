@@ -232,39 +232,81 @@ optimizer, LR, batch size e transforms; versões e hardware vão para `metrics.j
 
 ## Resultados
 
-> **Ainda não executados.** Os números abaixo serão preenchidos com a saída de
-> `python -m facerec.report` (arquivo `experiments/results/results_table.md`) depois de rodar os
-> experimentos na máquina do aluno. Nenhum valor desta seção é estimado ou inventado.
+Hardware e ambiente dos resultados abaixo: CPU Intel (12 threads), **sem GPU**, Windows 11,
+Python 3.11.17, torch 2.2.2+cpu, onnxruntime 1.17.3, facenet-pytorch 2.6.0 (registrado em
+`environment` de cada `metrics.json`). Tabela gerada por `python -m facerec.report`.
 
-| Experimento | Modelo | Estratégia | Dataset | Accuracy | F1 | EER | Observação |
-|---|---|---|---|---|---|---|---|
-| E01 | FaceNet | pré-treinado | LFW (10-fold) | — | — | — | |
-| E01 | FaceNet | pré-treinado | Privado (val.) | — | — | — | |
-| E02 | ArcFace | pré-treinado | LFW (10-fold) | — | — | — | |
-| E02 | ArcFace | pré-treinado | Privado (val.) | — | — | — | |
-| E03 | FaceNet | parcial + Triplet | LFW / Privado (val.) | — | — | — | |
-| E04 | FaceNet | parcial + ArcFace | LFW / Privado (val.) | — | — | — | |
-| E05 | FaceNet | completo | LFW / Privado (val.) | — | — | — | |
-| E06 | vencedor | 5 comparadores | Privado (val., open-set) | — | — | — | |
-| E07 | final | threshold | Privado (**teste**) | — | — | — | FAR/FRR |
-| E08 | MobileFaceNet | pré-treinado | LFW / Privado (val.) | — | — | — | params, ms/face |
+### Dataset público — LFW (protocolo oficial: 6000 pares, 10 folds)
 
-Gráficos: `experiments/results/roc_comparison_lfw.png`, `experiments/results/E0x/loss_curves.png`,
-`hist_*.png`, `confusion_*.png`, `E06/matchers_comparison.png`, `E07/threshold_sweep.png`.
+O threshold de cada fold é escolhido nos outros 9 folds; a acurácia é a média ± desvio dos 10 folds.
 
-### Análise (preencher com base nos resultados)
+| Experimento | Modelo | Estratégia | Dataset | Accuracy | F1 | EER | ROC-AUC | FAR | FRR | ms/face (CPU) | Parâmetros |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| E01 | FaceNet (VGGFace2) | pré-treinado, cosseno | LFW | 99,10% ± 0,43 | 99,10% | 0,93% | 0,9991 | 0,97% | 0,83% | 61,7 | 23,5 M |
+| E02 | ArcFace iResNet-50 (WebFace600K) | pré-treinado, cosseno | LFW | **99,85% ± 0,20** | **99,85%** | **0,30%** | **0,9995** | **0,00%** | **0,30%** | 90,3 | 43,6 M |
+| E08 | MobileFaceNet, ArcFace loss (WebFace600K) | pré-treinado, cosseno | LFW | 99,67% ± 0,20 | 99,67% | 0,32% | 0,9993 | 0,27% | 0,40% | **5,0** | **3,4 M** |
 
-- **Melhor modelo e por quê:** _(critério do ADR-001: menor EER na validação privada)._
-- **Impacto do fine-tuning:** comparar E03/E04/E05 com E01 (`best_epoch` = 0 indica que o fine-tuning
-  não superou o pré-treinado); parâmetros treináveis × ganho; sinais de overfitting nas curvas.
-- **Triplet × ArcFace:** E03 × E04 (mesmos blocos treináveis — só a loss muda).
-- **Parcial × completo:** E04 × E05 (mesma loss — só a estratégia muda) e tempo de treino.
-- **Tamanho do backbone:** E02 × E08 (mesma loss e mesmos dados de pré-treino) — EER × nº de parâmetros × ms/face.
-- **Comparadores:** cosseno e euclidiana devem empatar (para vetores L2, ‖a−b‖² = 2 − 2·cos);
-  discutir protótipo/k-NN/SVM no open-set.
-- **Threshold:** curva FAR × FRR do E07 e o valor escolhido; desempenho no teste com o threshold congelado.
-- **Erros encontrados:** categorias agregadas (ex.: pose extrema, baixa luz, óculos escuros).
-- **Custo × desempenho:** `cost.n_parameters` e `cost.inference_ms_per_face` de cada modelo.
+Matrizes de confusão (soma dos 10 folds, 3000 pares de cada tipo):
+
+| Modelo | Mesma pessoa aceita (VP) | Mesma pessoa rejeitada (FN) | Diferentes aceitas (FP) | Diferentes rejeitadas (VN) |
+|---|---|---|---|---|
+| FaceNet | 2975 | 25 | 29 | 2971 |
+| ArcFace iResNet-50 | 2991 | 9 | 0 | 3000 |
+| MobileFaceNet | 2988 | 12 | 8 | 2992 |
+
+Gráficos: [`roc_comparison_lfw.png`](experiments/results/roc_comparison_lfw.png) e, em
+`experiments/results/E0x/`, `roc_lfw.png`, `hist_lfw.png` (mesma pessoa × diferentes) e `confusion_lfw.png`.
+
+### Impacto do pré-processamento (ablação: escolha da face)
+
+1812 das 13 233 imagens do LFW têm mais de um rosto. Na primeira execução o pré-processamento
+escolhia o **maior** rosto; no LFW a pessoa rotulada é a do **centro** da imagem, e o maior rosto às
+vezes é outra pessoa. Com isso, pares "mesma pessoa" viravam, na prática, pessoas diferentes.
+
+| Modelo | Acurácia (maior face) | Acurácia (face central) | EER (maior) | EER (central) | Pares "mesma pessoa" rejeitados |
+|---|---|---|---|---|---|
+| FaceNet | 95,90% | 99,10% | 6,10% | 0,93% | 219 → 25 |
+| ArcFace iResNet-50 | 96,42% | 99,85% | 6,02% | 0,30% | 215 → 9 |
+| MobileFaceNet | 96,28% | 99,67% | 6,30% | 0,32% | 216 → 12 |
+
+O sinal do problema: três modelos muito diferentes rejeitavam quase os **mesmos** ~216 pares e
+quase nunca aceitavam impostores — o erro estava nos dados de entrada, não nos modelos.
+Resultados "antes" em [`experiments/results/ablation_face_selection/`](experiments/results/ablation_face_selection).
+
+### Dataset do grupo (pasta `pessoas/`)
+
+Avaliado com `python -m facerec.evaluate_folder` (protocolo na seção "Avaliação no dataset do
+grupo"). Resultados a publicar em `experiments/results/dataset_grupo/` quando o dataset for ampliado
+(o teste preliminar com 3 pessoas × 3 fotos foi pequeno demais para diferenciar os modelos:
+todos atingiram AUC 1,0).
+
+### Experimentos ainda não executados
+
+| Experimento | Motivo |
+|---|---|
+| E03, E04, E05 (fine-tuning) | exigem o CelebA (download manual) e GPU para tempo razoável |
+| E06, E07 (comparadores e threshold, protocolo por sessões) | exigem o dataset privado organizado por sessão; o `evaluate_folder` já compara comparadores e calibra o threshold na pasta do grupo |
+
+### Análise
+
+- **Melhor modelo no benchmark público:** o **ArcFace iResNet-50 (E02)** teve a maior acurácia
+  (99,85%), o menor EER (0,30%) e **nenhum falso aceite** em 3000 pares de pessoas diferentes.
+  A hipótese do E02 se confirma: a margem angular aditiva (e o pré-treino em mais identidades) gera
+  embeddings mais separáveis que a FaceNet/Triplet do E01 (EER 0,93%, ~3× maior).
+- **Custo × desempenho (E02 × E08):** com a mesma loss e os mesmos dados de pré-treino, o
+  MobileFaceNet perde só 0,18 ponto de acurácia (EER 0,32% × 0,30%), mas é **~18× mais rápido**
+  (5,0 × 90,3 ms/face em CPU) e **~13× menor** (3,4 M × 43,6 M parâmetros). Para uma aplicação em
+  tempo real em notebook sem GPU, é a melhor relação custo × desempenho; a diferença de acurácia
+  está dentro do desvio entre folds (±0,20).
+- **Impacto do pré-processamento:** escolher a face errada em imagens com várias pessoas custava
+  3,2–3,4 pontos de acurácia e multiplicava o EER por ~7–20× — mais do que a diferença entre os modelos.
+  Detecção/alinhamento corretos importam tanto quanto a arquitetura.
+- **Erros restantes:** com a face correta, os erros são raros e dominados por pares "mesma pessoa"
+  rejeitados (FN), tipicamente com grande diferença de pose, idade ou iluminação entre as fotos.
+- **Impacto do fine-tuning / Triplet × ArcFace / parcial × completo:** _pendente (E03–E05)._
+- **Threshold:** no LFW, o threshold é calibrado por fold e depende do modelo (cosseno médio: FaceNet
+  0,37; ArcFace 0,25; MobileFaceNet 0,21) — por isso cada modelo precisa do seu próprio threshold; na
+  pasta do grupo, por validação cruzada entre pessoas (`threshold_mean` em `metrics.json`).
 
 ### Limitações conhecidas
 - Dataset privado pequeno → alta variância das métricas privadas.

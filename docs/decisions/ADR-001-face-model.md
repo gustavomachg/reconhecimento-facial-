@@ -31,8 +31,20 @@ aberto; os modelos ArcFace são usados congelados.
    escolher o modelo pelo conjunto de teste público);
 3. custo: tempo de inferência por face (`cost.inference_ms_per_face`) — aceitável até ~100 ms em CPU.
 
+## Evidências até agora (LFW, protocolo 10-fold, CPU)
+| Modelo | Acurácia | EER | ms/face | Parâmetros |
+|---|---|---|---|---|
+| FaceNet (E01) | 99,10% | 0,93% | 61,7 | 23,5 M |
+| ArcFace iResNet-50 (E02) | 99,85% | 0,30% | 90,3 | 43,6 M |
+| MobileFaceNet (E08) | 99,67% | 0,32% | 5,0 | 3,4 M |
+
+No teste preliminar na pasta do grupo (3 pessoas × 3 fotos) os três empataram (AUC 1,0).
+
 ## Decisão
-_A preencher após rodar E01–E05 e E08:_ modelo = `____`, EER val. = `____`, motivo: `____`.
+**Provisória:** MobileFaceNet (E08). No LFW, empata com o ArcFace iResNet-50 dentro do desvio
+entre folds (EER 0,32% × 0,30%) e é ~18× mais rápido, o que permite reconhecimento em tempo real
+em CPU (critério 3). A decisão final depende do EER no dataset do grupo ampliado (critério 1);
+se o iResNet-50 tiver EER claramente menor lá, ele passa a ser o escolhido.
 Atualizar `configs/app.yaml` (`model`), `E06`/`E07` (`model`, `aligned_root`).
 
 ## Consequências

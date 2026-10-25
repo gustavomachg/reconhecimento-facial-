@@ -1,0 +1,11 @@
+{
+  "dataset": "lfw",
+  "model": "arcface",
+  "total": 13233,
+  "face_selection": "center",
+  "ok": 13232,
+  "no_face": 0,
+  "multiple_faces": 1812,
+  "fallback_center": 1,
+  "unreadable": 0
+}
