@@ -1,0 +1,11 @@
+{
+  "dataset": "celeba",
+  "max_hamming_distance": 16,
+  "set_sizes": {
+    "train": 17129,
+    "val": 3588,
+    "test": 3582
+  },
+  "n_cross_duplicates": 0,
+  "by_pair": {}
+}

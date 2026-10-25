@@ -245,6 +245,8 @@ O threshold de cada fold é escolhido nos outros 9 folds; a acurácia é a médi
 | E01 | FaceNet (VGGFace2) | pré-treinado, cosseno | LFW | 99,10% ± 0,43 | 99,10% | 0,93% | 0,9991 | 0,97% | 0,83% | 61,7 | 23,5 M |
 | E02 | ArcFace iResNet-50 (WebFace600K) | pré-treinado, cosseno | LFW | **99,85% ± 0,20** | **99,85%** | **0,30%** | **0,9995** | **0,00%** | **0,30%** | 90,3 | 43,6 M |
 | E08 | MobileFaceNet, ArcFace loss (WebFace600K) | pré-treinado, cosseno | LFW | 99,67% ± 0,20 | 99,67% | 0,32% | 0,9993 | 0,27% | 0,40% | **5,0** | **3,4 M** |
+| E03 | FaceNet + fine-tuning parcial (Triplet) — **melhor época na validação** | = pré-treinado (época 0) | LFW | 99,10% ± 0,43 | 99,10% | 0,93% | 0,9991 | 0,97% | 0,83% | 61,7 | 23,5 M (10,5 M treináveis) |
+| E03 | FaceNet + fine-tuning parcial (Triplet) — **última época (4)** | fine-tuning parcial | LFW | 98,40% ± 0,54 | 98,39% | 1,77% | 0,9982 | 1,23% | 1,97% | 61,7 | 23,5 M (10,5 M treináveis) |
 
 Matrizes de confusão (soma dos 10 folds, 3000 pares de cada tipo):
 
@@ -273,6 +275,25 @@ O sinal do problema: três modelos muito diferentes rejeitavam quase os **mesmos
 quase nunca aceitavam impostores — o erro estava nos dados de entrada, não nos modelos.
 Resultados "antes" em [`experiments/results/ablation_face_selection/`](experiments/results/ablation_face_selection).
 
+### Fine-tuning (E03): FaceNet, fine-tuning parcial + Triplet Loss
+
+Treino em 695 identidades do CelebA (17 129 imagens), validação em 149 identidades **disjuntas**
+(3588 imagens); 7 identidades suspeitas de também estarem no LFW foram excluídas e não houve
+quase-duplicatas entre os conjuntos. GPU RTX 4050 Laptop, precisão mista, 177 s de treino.
+Blocos treináveis: `repeat_3`, `block8`, `last_linear`, `last_bn` (10,5 M de 23,5 M parâmetros).
+
+| Época | Loss treino (triplet) | Loss validação | EER validação |
+|---|---|---|---|
+| 0 (pré-treinado) | — | 0,059 | **3,10%** |
+| 1 | 0,080 | 0,069 | 3,63% |
+| 2 | 0,073 | 0,070 | 3,40% |
+| 3 | 0,067 | 0,072 | 3,60% |
+| 4 | 0,060 | 0,075 | 3,80% |
+
+A loss de treino cai enquanto a de validação sobe desde a 1ª época: **overfitting**. O early
+stopping (paciência 4) manteve o modelo pré-treinado como melhor checkpoint. Curvas em
+[`experiments/results/E03/loss_curves.png`](experiments/results/E03/loss_curves.png).
+
 ### Dataset do grupo (pasta `pessoas/`)
 
 Avaliado com `python -m facerec.evaluate_folder` (protocolo na seção "Avaliação no dataset do
@@ -284,7 +305,7 @@ todos atingiram AUC 1,0).
 
 | Experimento | Motivo |
 |---|---|
-| E03, E04, E05 (fine-tuning) | exigem o CelebA (download manual) e GPU para tempo razoável |
+| E04, E05 (fine-tuning com ArcFace loss / completo) | não exigidos nesta entrega; configs prontas (`configs/experiments/`) e mesma infraestrutura do E03 |
 | E06, E07 (comparadores e threshold, protocolo por sessões) | exigem o dataset privado organizado por sessão; o `evaluate_folder` já compara comparadores e calibra o threshold na pasta do grupo |
 
 ### Análise
@@ -303,7 +324,15 @@ todos atingiram AUC 1,0).
   Detecção/alinhamento corretos importam tanto quanto a arquitetura.
 - **Erros restantes:** com a face correta, os erros são raros e dominados por pares "mesma pessoa"
   rejeitados (FN), tipicamente com grande diferença de pose, idade ou iluminação entre as fotos.
-- **Impacto do fine-tuning / Triplet × ArcFace / parcial × completo:** _pendente (E03–E05)._
+- **Impacto do fine-tuning (E03):** a hipótese "adapta ao domínio sem overfitting" foi
+  **refutada**. Treinar os últimos blocos da FaceNet com Triplet Loss no CelebA piorou a rede em
+  pessoas novas: na validação o EER subiu de 3,10% para 3,4–3,8%, e no LFW o modelo da última época
+  caiu de 99,10% para 98,40% (EER 0,93% → 1,77%). Interpretação: a FaceNet já foi pré-treinada no
+  VGGFace2 (~3,3 M imagens, ~9 mil identidades); 17 mil imagens de 695 pessoas são poucas e, com
+  10,5 M parâmetros livres, a rede passa a decorar as identidades do treino em vez de melhorar o
+  espaço de embeddings em geral. O early stopping pela validação evitou que esse modelo pior fosse
+  usado. Possíveis melhorias (não testadas): learning rate menor, menos blocos treináveis, mais
+  identidades ou ArcFace loss (E04).
 - **Threshold:** no LFW, o threshold é calibrado por fold e depende do modelo (cosseno médio: FaceNet
   0,37; ArcFace 0,25; MobileFaceNet 0,21) — por isso cada modelo precisa do seu próprio threshold; na
   pasta do grupo, por validação cruzada entre pessoas (`threshold_mean` em `metrics.json`).

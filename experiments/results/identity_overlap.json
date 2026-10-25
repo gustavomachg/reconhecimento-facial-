@@ -1,0 +1,14 @@
+{
+  "model": "facenet",
+  "threshold": 0.8,
+  "n_celeba_identities": 1000,
+  "n_lfw_identities": 5749,
+  "n_suspect_pairs": 7,
+  "n_suspect_celeba_identities_excluded": 7,
+  "max_similarity_percentiles": {
+    "50": 0.5663753151893616,
+    "90": 0.659865015745163,
+    "99": 0.7874655556678771,
+    "100": 0.9223495721817017
+  }
+}

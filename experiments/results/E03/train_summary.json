@@ -1,0 +1,89 @@
+{
+  "experiment": {
+    "id": "E03",
+    "name": "facenet_partial_triplet",
+    "strategy": "partial",
+    "hypothesis": "Fine-tuning s\u00f3 dos \u00faltimos blocos com Triplet Loss (batch-hard) adapta a rede ao dom\u00ednio sem overfitting, pois a maior parte dos pesos fica congelada."
+  },
+  "strategy": "partial",
+  "trainable_blocks": [
+    "repeat_3",
+    "block8",
+    "last_linear",
+    "last_bn"
+  ],
+  "loss": {
+    "name": "triplet",
+    "margin": 0.2
+  },
+  "n_parameters": 23482624,
+  "n_trainable_parameters": 10523136,
+  "n_train_identities": 695,
+  "n_val_identities": 149,
+  "n_train_images": 17129,
+  "n_val_images": 3588,
+  "best_val_eer": 0.030999999999999993,
+  "best_epoch": 0,
+  "pretrained_val_eer": 0.030999999999999993,
+  "train_time_s": 177.3,
+  "device": "cuda",
+  "amp": true,
+  "history": [
+    {
+      "epoch": 0,
+      "train_loss": NaN,
+      "val_loss": 0.05902153564550515,
+      "val_eer": 0.030999999999999993,
+      "val_auc": 0.9920111111111111,
+      "lr": 0.0001
+    },
+    {
+      "epoch": 1,
+      "train_loss": 0.07990969082842884,
+      "val_loss": 0.06943901857760336,
+      "val_eer": 0.03633333333333335,
+      "val_auc": 0.9917195555555556,
+      "lr": 9.890738003669029e-05
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.0730280985991202,
+      "val_loss": 0.07019880330855292,
+      "val_eer": 0.034000000000000016,
+      "val_auc": 0.990984,
+      "lr": 9.567727288213005e-05
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.0671374908533324,
+      "val_loss": 0.07210534235595592,
+      "val_eer": 0.03600000000000002,
+      "val_auc": 0.9907542222222222,
+      "lr": 9.045084971874738e-05
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.060296197669503844,
+      "val_loss": 0.07460195105522871,
+      "val_eer": 0.038,
+      "val_auc": 0.9913671111111111,
+      "lr": 8.345653031794292e-05
+    }
+  ],
+  "environment": {
+    "python": "3.11.17",
+    "platform": "Windows-10-10.0.26300-SP0",
+    "processor": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+    "numpy": "1.26.4",
+    "torch": "2.2.2+cu121",
+    "cuda_available": true,
+    "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "torchvision": "0.17.2+cu121",
+    "facenet-pytorch": "2.6.0",
+    "onnxruntime": "1.17.3",
+    "scikit-learn": "1.4.2",
+    "Pillow": "10.2.0",
+    "cpu_count": 12,
+    "gpu_memory_gb": 6.0
+  }
+}

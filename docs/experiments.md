@@ -67,9 +67,16 @@ diferença de resultado possa ser atribuída a esse fator.
 - **Estratégia:** fine-tuning parcial; Triplet Loss com batch-hard mining (margem 0,2), batches P×K = 16×4.
 - **Hiperparâmetros:** Adam, LR 1e-4, weight decay 5e-4, cosine annealing, 15 épocas,
   early stopping (paciência 4) pelo EER de validação; augmentation: recorte, flip, cor, rotação ±10°, cinza.
-- **Comandos:** `python -m facerec.train --config …E03…` e `python -m facerec.evaluate --config …E03…`
-- **Resultado:** _a preencher (`train_summary.json`, `loss_curves.png`, `metrics.json`)_
-- **Interpretação:** _a preencher (ver `best_epoch`: 0 = o fine-tuning não superou o pré-treinado)_
+- **Comandos:** `python -m facerec.train --config …E03…`, `python -m facerec.evaluate --config …E03…`
+  e `… --checkpoint last` (modelo da última época, em `E03/ultima_epoca/`)
+- **Dados efetivos:** 695 identidades / 17 129 imagens de treino, 149 / 3588 de validação
+  (disjuntas); 7 identidades excluídas por sobreposição com o LFW; 0 quase-duplicatas.
+- **Resultado:** `best_epoch` = 0 (nenhuma época superou o pré-treinado; EER val. 3,10% → 3,4–3,8%;
+  loss de validação 0,059 → 0,075 enquanto a de treino caiu 0,080 → 0,060). No LFW: melhor
+  checkpoint = 99,10% (igual ao E01); última época = **98,40% ± 0,54, EER 1,77%**. 177 s em GPU.
+- **Interpretação:** hipótese **refutada** — houve overfitting já na 1ª época. Com poucos dados em
+  relação ao pré-treino (VGGFace2), liberar 10,5 M parâmetros com Triplet Loss faz a rede decorar
+  as identidades do treino. O early stopping pela validação protegeu o resultado final.
 
 ## E04 — FaceNet, fine-tuning parcial + ArcFace Loss
 - **Hipótese:** com os mesmos blocos do E03, a ArcFace converge melhor com poucos dados, porque usa

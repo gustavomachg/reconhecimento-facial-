@@ -1,0 +1,65 @@
+# E03 — facenet_partial_triplet
+experiment:
+  id: E03
+  name: facenet_partial_triplet
+  strategy: partial
+  hypothesis: >-
+    Fine-tuning só dos últimos blocos com Triplet Loss (batch-hard) adapta a rede ao domínio sem overfitting, pois a maior parte dos pesos fica congelada.
+seed: 42
+device: auto
+
+model:
+  name: facenet
+  pretrained: vggface2
+
+data:
+  dataset: CelebA (subconjunto, identidades com >= 15 imagens)
+  aligned_root: data/public/aligned_facenet/celeba
+  exclude_identities_file: data/public/celeba_exclude.txt   # gerado por check_identity_overlap.py
+  exclude_files_list: data/public/duplicates_exclude.txt    # gerado por check_duplicates.py
+  val_fraction: 0.15      # identidades DISJUNTAS do treino
+  test_fraction: 0.15     # identidades reservadas (nunca usadas)
+  image_size: 160
+  val_pairs: 3000
+  num_workers: 2
+  augment:                # aplicado só no treino, depois do split
+    enabled: true
+    min_scale: 0.85
+    rotation: 10
+    color_p: 0.8
+    gray_p: 0.1
+
+training:
+  strategy: partial
+  trainable_blocks: [repeat_3, block8, last_linear, last_bn]
+  epochs: 15
+  optimizer: adam
+  lr: 1.0e-4
+  weight_decay: 0.0005
+  scheduler: cosine
+  early_stopping_patience: 4
+  batch:            # P identidades x K imagens por batch (necessário para o hard mining)
+    p: 16
+    k: 4
+loss:
+  name: triplet
+  margin: 0.2
+evaluation:
+  lfw:
+    root: data/public/aligned_facenet/lfw
+    pairs: data/public/aligned_facenet/lfw/pairs.txt
+  lfw_strategy: max_accuracy   # threshold de cada fold escolhido nos outros 9 folds
+  private:
+    enabled: true
+    aligned_root: data/private/aligned_facenet
+    gallery_sessions: [s1]
+    val_sessions: [s2]
+    test_sessions: [s3]
+    n_unknown_val: 1
+    n_unknown_test: 1
+    n_pairs: 2000
+
+
+output:
+  checkpoint: checkpoints/finetuned/E03.pt   # ignorado pelo git
+  results_dir: experiments/results/E03

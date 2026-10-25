@@ -1,0 +1,11 @@
+{
+  "dataset": "celeba",
+  "model": "facenet",
+  "total": 24524,
+  "face_selection": "center",
+  "ok": 24454,
+  "no_face": 70,
+  "multiple_faces": 200,
+  "fallback_center": 0,
+  "unreadable": 0
+}
