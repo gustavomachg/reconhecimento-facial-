@@ -61,3 +61,8 @@ dist/
 # Instruções locais de ferramentas de desenvolvimento (não versionar)
 CLAUDE.md
 .claude/
+
+# Certificados HTTPS locais (chave privada) — nunca versionar
+certs/
+*.pem
+*.key

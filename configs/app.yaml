@@ -1,10 +1,14 @@
-# Configuração da aplicação (Parte 2). Atualize com a configuração vencedora da Parte 1.
+# Configuração da aplicação (Parte 2) — usa a configuração vencedora da Parte 1.
 device: auto
 
 model:
-  name: facenet                 # facenet | arcface (vencedor de E01–E05, ver ADR-001)
-  # path: checkpoints/public/buffalo_l/w600k_r50.onnx   # se arcface
-  # checkpoint: checkpoints/finetuned/E04.pt            # se facenet fine-tunada
+  # Vencedor da Parte 1 (ADR-001): MobileFaceNet / ArcFace loss (E08), executado via ONNX.
+  # Baixe com: python scripts/download_arcface.py --pack buffalo_s
+  name: arcface                 # "arcface" = qualquer ONNX do insightface (iResNet-50 ou MobileFaceNet)
+  path: checkpoints/public/buffalo_s/w600k_mbf.onnx
+  # Alternativas avaliadas na Parte 1 (trocar exige rodar o E07 de novo — ADR-003):
+  # path: checkpoints/public/buffalo_l/w600k_r50.onnx   # ArcFace iResNet-50 (E02)
+  # name: facenet                                        # FaceNet (E01/E03)
 
 detection:
   prob_threshold: 0.95          # confiança mínima do MTCNN para contar como face
@@ -12,12 +16,24 @@ detection:
   blur_threshold: 15.0          # variância do Laplaciano do recorte; abaixo -> LowQualityImage
 
 recognition:
-  matcher: prototype            # vencedor do E06
+  # Cada modelo tem sua própria escala de cosseno: os valores abaixo são para o MobileFaceNet.
+  # PROVISÓRIOS até o E07 rodar no dataset do grupo (ADR-003). Ponto de partida: o threshold
+  # de EER do E08 no LFW (0,206; FAR 0,27% / FRR 0,40%), arredondado para cima para
+  # priorizar não aceitar desconhecidos.
+  matcher: prototype            # PROVISÓRIO — confirmar com o E06
   matcher_kwargs: {}
-  threshold: 0.55               # PROVISÓRIO — substituir pelo valor do E07 (ADR-003)
-  duplicate_threshold: 0.75     # cosseno; cadastro com similaridade >= isto é recusado
-  consistency_threshold: 0.40   # menor cosseno entre duas fotos do próprio cadastro
+  threshold: 0.25               # score >= threshold -> reconhecido
+  duplicate_threshold: 0.60     # cosseno; cadastro com similaridade >= isto é recusado
+  consistency_threshold: 0.20   # menor cosseno entre duas fotos do próprio cadastro (≈ EER do LFW)
   max_enroll_images: 10
+
+door:
+  open_seconds: 5               # tempo que a porta (simulada) fica aberta
+
+auth:
+  session_hours: 8              # tempo até pedir o login de novo
+  max_failed_logins: 5          # erros seguidos no mesmo e-mail antes do bloqueio temporário
+  lockout_seconds: 60           # duração do bloqueio
 
 storage:
   db_path: embeddings/facerec.db   # ignorado pelo git

@@ -106,3 +106,15 @@ def test_app_config():
     assert cfg["storage"]["store_photos"] is False  # minimização por padrão
     assert 0 < cfg["recognition"]["threshold"] < 1
     assert cfg["storage"]["db_path"].startswith("embeddings/")
+
+
+def test_app_uses_part1_winner():
+    """A aplicação usa o vencedor da Parte 1 (ADR-001); E06/E07 calibram o mesmo modelo."""
+    app_model = load_yaml(PROJECT_ROOT / "configs" / "app.yaml")["model"]
+    exp = PROJECT_ROOT / "configs" / "experiments"
+    assert app_model == load_yaml(exp / "E08_mobilefacenet_pretrained.yaml")["model"]
+    for name in ("E06_matchers_open_set.yaml", "E07_threshold_sweep.yaml"):
+        assert load_yaml(exp / name)["model"] == app_model
+    rec = load_yaml(PROJECT_ROOT / "configs" / "app.yaml")["recognition"]
+    # duplicidade exige similaridade bem maior que o reconhecimento; consistência, menor
+    assert rec["consistency_threshold"] <= rec["threshold"] < rec["duplicate_threshold"]

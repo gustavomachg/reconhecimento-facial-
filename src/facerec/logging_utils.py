@@ -10,7 +10,22 @@ import json
 import logging
 import time
 
-FORBIDDEN_KEYS = {"name", "display_name", "nome", "image", "photo", "embedding", "vector"}
+FORBIDDEN_KEYS = {
+    "name",
+    "display_name",
+    "nome",
+    "unit",
+    "apartamento",
+    "email",
+    "e-mail",
+    "password",
+    "senha",
+    "password_hash",
+    "image",
+    "photo",
+    "embedding",
+    "vector",
+}
 
 _logger = logging.getLogger("facerec")
 

@@ -10,6 +10,7 @@ class FaceRecError(Exception):
 
     code = "face_rec_error"
     message = "Erro no reconhecimento facial."
+    http_status = 422  # status devolvido pela API
 
     def __init__(self, message: str | None = None):
         super().__init__(message or self.message)
@@ -48,3 +49,30 @@ class InconsistentEnrollment(FaceRecError):
 class PersonNotFound(FaceRecError):
     code = "person_not_found"
     message = "Pessoa não encontrada."
+    http_status = 404
+
+
+class NotAuthenticated(FaceRecError):
+    code = "not_authenticated"
+    message = "Faça login para continuar."
+    http_status = 401
+
+
+class InvalidCredentials(FaceRecError):
+    """Mensagem única para e-mail inexistente OU senha errada (não revela qual dos dois)."""
+
+    code = "invalid_credentials"
+    message = "E-mail ou senha incorretos."
+    http_status = 401
+
+
+class EmailAlreadyRegistered(FaceRecError):
+    code = "email_in_use"
+    message = "Este e-mail já está cadastrado. Entre com a sua conta."
+    http_status = 409
+
+
+class TooManyAttempts(FaceRecError):
+    code = "too_many_attempts"
+    message = "Muitas tentativas de login. Aguarde um pouco e tente de novo."
+    http_status = 429

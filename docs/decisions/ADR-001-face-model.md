@@ -1,6 +1,6 @@
 # ADR-001 — Modelo de reconhecimento facial
 
-**Status:** proposto — **decisão final pendente dos resultados de E01–E05 e E08**
+**Status:** aceito (MobileFaceNet, E08) — revisável após o E06/E07 no dataset do grupo
 **Data:** 2026-10-24
 
 ## Contexto
@@ -41,11 +41,21 @@ aberto; os modelos ArcFace são usados congelados.
 No teste preliminar na pasta do grupo (3 pessoas × 3 fotos) os três empataram (AUC 1,0).
 
 ## Decisão
-**Provisória:** MobileFaceNet (E08). No LFW, empata com o ArcFace iResNet-50 dentro do desvio
-entre folds (EER 0,32% × 0,30%) e é ~18× mais rápido, o que permite reconhecimento em tempo real
-em CPU (critério 3). A decisão final depende do EER no dataset do grupo ampliado (critério 1);
-se o iResNet-50 tiver EER claramente menor lá, ele passa a ser o escolhido.
-Atualizar `configs/app.yaml` (`model`), `E06`/`E07` (`model`, `aligned_root`).
+**Aceita (Parte 2):** **MobileFaceNet com ArcFace loss (E08)**, pré-treinado e congelado, via ONNX
+(`checkpoints/public/buffalo_s/w600k_mbf.onnx`). É o modelo configurado em `configs/app.yaml`.
+
+Justificativa, seguindo os critérios definidos antes dos resultados:
+1. **Critério 1 (domínio do grupo):** no teste da pasta do grupo os três modelos empataram
+   (AUC 1,0), então esse critério não separa os candidatos.
+2. **Critério 2 (LFW, desempate):** empata com o iResNet-50 dentro do desvio entre folds
+   (EER 0,32% × 0,30%; acurácia 99,67% ± 0,20 × 99,85% ± 0,20) e supera a FaceNet
+   (EER 0,93%), inclusive a fine-tunada (E03 não melhorou o baseline).
+3. **Critério 3 (custo):** **5,0 ms/face** contra 90,3 ms do iResNet-50 e 61,7 ms da FaceNet,
+   com 3,4 M parâmetros. Isso é o que permite o reconhecimento **contínuo pela câmera** em CPU
+   (spec 007), em que o modelo roda várias vezes por segundo.
+
+Revisão: se o E06/E07 no dataset do grupo ampliado mostrar EER do iResNet-50 claramente menor
+(fora do desvio), trocar `model.path` em `configs/app.yaml` e rodar o E07 de novo (ADR-003).
 
 ## Consequências
 - Se o ArcFace vencer, a aplicação herda a restrição de uso **não comercial** (declarado no README).

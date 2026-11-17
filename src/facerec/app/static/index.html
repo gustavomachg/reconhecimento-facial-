@@ -2,157 +2,1080 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reconhecedor Facial</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Portaria Facial</title>
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --fg:#1d2330; --muted:#667085; --ok:#12805c; --bad:#b42318; --accent:#2f5bd3; --line:#e4e7ec; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#12151b; --card:#1b2029; --fg:#e8eaee; --muted:#98a2b3; --line:#2c3340; --accent:#7b9cff; --ok:#3ccf91; --bad:#ff7a6e; } }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--fg); }
-  header { padding:16px 20px; border-bottom:1px solid var(--line); }
-  header h1 { margin:0; font-size:1.25rem; }
-  header p { margin:4px 0 0; color:var(--muted); font-size:.9rem; }
-  main { display:grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1fr); gap:16px; padding:16px 20px; max-width:1200px; margin:auto; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; padding:16px; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
-  h2 { font-size:1rem; margin:0 0 12px; }
-  video, canvas { width:100%; border-radius:8px; background:#000; aspect-ratio:4/3; object-fit:cover; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center; }
-  button { border:1px solid var(--line); background:var(--card); color:var(--fg); padding:8px 12px; border-radius:8px; cursor:pointer; font:inherit; }
-  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
-  button.danger { color:var(--bad); }
-  button:disabled { opacity:.5; cursor:default; }
-  input[type=text] { flex:1; min-width:160px; padding:8px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--fg); font:inherit; }
-  #result { font-size:1.15rem; font-weight:600; margin-top:12px; min-height:1.6em; }
-  #result.ok { color:var(--ok); } #result.bad { color:var(--bad); }
-  .thumbs { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
-  .thumbs img { width:56px; height:56px; object-fit:cover; border-radius:6px; }
+  /* Sem fontes externas: o sistema promete processamento 100% local, então nada é pedido à internet. */
+  :root {
+    --bg:#070a2a; --panel:#0c1152; --panel2:#151b72; --text:#f2f2f2; --muted:#a9b0f0; --line:#2b35b0;
+    --accent:#ffd166; --accent2:#ffb347; --accent-soft:rgba(255,209,102,.12); --accent-ink:#1c1400;
+    --ok:#3ddc97; --err:#ff6b5e; --warn:#ffb347;
+    --serif:"Playfair Display","Bodoni MT",Didot,Georgia,serif;
+    --display:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+    --mono:Consolas,"SFMono-Regular","Cascadia Mono",ui-monospace,monospace;
+  }
+  @font-face { font-family:"Playfair Display"; src:url("/static/vendor/PlayfairDisplay-latin-400.woff2") format("woff2"); font-weight:400; font-style:normal; font-display:swap; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  [hidden] { display:none !important; }
+  body { margin:0; color:var(--text); font:15px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif; min-height:100vh;
+    background:linear-gradient(180deg,#1626d9 0%,#0b1180 32%,#060833 72%,#04051f 100%);
+    background-attachment:fixed; display:flex; flex-direction:column; overflow-x:clip; }   /* a palavra gigante passa das bordas */
+  * { scrollbar-width:thin; scrollbar-color:#3a45c9 transparent; }
+  svg { display:block; }
+
+  /* ---------- fundo 3D (three.js) e movimento ---------- */
+  #bg3d { position:fixed; inset:0; width:100%; height:100%; z-index:1; pointer-events:none; opacity:0; transition:opacity 1.2s ease; }
+  #bg3d.ready { opacity:1; }
+  /* Início, no estilo de páginas editoriais de 3D: uma PALAVRA GIGANTE que passa das bordas da
+     tela, uma porta só de contorno no meio (fresta de luz e duas luzes fortes), um anel de luz e
+     névoa no chão, e os botões como adesivos amarelos espelhados no pé da porta.
+     Uma medida manda em tudo: --fs (tamanho da palavra, limitado pela largura e pela altura da
+     tela); a porta e os espaços derivam dela. Camadas: névoa e palavra (z 0) < cena 3D (z 1) <
+     adesivos e texto (z 2). Sem WebGL, as linhas da porta em CSS fazem o papel da porta 3D.
+     Proporção 2,2 : 2,6 = a mesma da porta em scene.js. */
+  .hero { position:relative; text-align:center; padding:0 0 8px;
+    --fs:min(19.5vw, 40vh);                                              /* a palavra inteira cabe na largura */
+    --door-w:clamp(220px, min(calc(var(--fs) * 1.9), 42vh), 520px); }     /* porta grande, como na referência */
+  @media (max-width:560px) { .hero { --door-w:min(62vw, 260px); } main { padding-top:10px; padding-bottom:20px; } }   /* celular: sobra altura, a porta cresce */
+  /* faixa da largura da tela: corta a palavra e a névoa nas bordas sem criar rolagem lateral */
+  .hero-door { position:relative; display:flex; justify-content:center; margin:8px 0 0 calc(50% - 50vw); width:100vw; overflow-x:clip; overflow-y:visible; }
+  .bigword { position:absolute; left:50%; top:50%; transform:translate(calc(-50% + var(--px, 0px)), calc(-50% + var(--py, 0px))); transition:transform .6s cubic-bezier(.2,.8,.2,1); z-index:0; pointer-events:none; user-select:none; white-space:nowrap;
+    font-family:var(--serif); font-weight:400; font-size:var(--fs); line-height:.9; letter-spacing:-.02em; color:#e4e4ea; }
+  .doorway { position:relative; z-index:1; width:var(--door-w); aspect-ratio:2.2 / 2.6; pointer-events:none;
+    border:1.5px solid rgba(150,155,255,.9); background:rgba(60,80,255,.06); }
+  .doorway::after { content:""; position:absolute; left:50%; top:0; bottom:0; width:2px; margin-left:-1px; background:#7df3ff; }
+  body.has3d .doorway { border-color:transparent; background:none; } body.has3d .doorway::after { display:none; }
+  /* névoa escura no chão, dos dois lados da porta (como fumaça baixa) */
+  .fog { position:absolute; z-index:0; left:50%; top:calc(100% - var(--door-w) * .1); width:max(140vw, 900px); height:calc(var(--door-w) * .9); transform:translateX(-50%); pointer-events:none; filter:blur(14px);
+    background:radial-gradient(28% 40% at 22% 45%, rgba(3,4,22,.75), transparent 70%), radial-gradient(30% 45% at 78% 50%, rgba(3,4,22,.7), transparent 70%),
+      radial-gradient(22% 35% at 50% 75%, rgba(3,4,22,.6), transparent 70%), radial-gradient(40% 30% at 50% 20%, rgba(70,90,255,.18), transparent 75%); }
+  /* adesivos amarelos (os botões), espelhados: o ponto fica do lado de fora de cada um */
+  .stickers { position:absolute; z-index:2; left:50%; top:100%; transform:translate(-50%, -50%); display:flex; gap:12px; white-space:nowrap; }
+  .sticker { display:inline-flex; align-items:center; gap:10px; padding:12px 18px; border:0; border-radius:3px; cursor:pointer;
+    background:linear-gradient(180deg,#ffe39c,#ffc857); color:#141006; font:900 clamp(12px, 1.2vw, 16px)/1 "Arial Black","Segoe UI Black",system-ui,sans-serif;
+    letter-spacing:.1em; text-transform:uppercase; box-shadow:0 3px 0 #b07f22, 0 12px 26px rgba(0,0,40,.45); transition:transform .15s, background .15s; }
+  .sticker::before { content:""; width:9px; height:9px; border-radius:50%; background:#141006; box-shadow:0 0 0 2px rgba(255,255,255,.35); flex:none; }
+  .sticker.mirror { flex-direction:row-reverse; }
+  .sticker:hover:not(:disabled) { background:#fff; border-color:transparent; transform:translateY(-2px); }
+  .sticker:active:not(:disabled) { transform:translateY(1px); box-shadow:0 1px 0 #b07f22; }
+  .hero .lead, .hero .count-line { position:relative; z-index:2; }
+  .hero .lead { max-width:52ch; margin:calc(var(--door-w) * .22 + 18px) auto 0; font-size:12.5px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.62); }
+  /* estado do sistema, como as legendas em fonte mono da tela de carregamento */
+  .count-line { display:inline-flex; align-items:center; gap:9px; margin-top:14px; font:600 11px/1 var(--mono); letter-spacing:.2em; text-transform:uppercase; color:#8fa0ff; }
+  .count-line::before { content:""; width:7px; height:7px; border-radius:50%; background:#7df3ff; flex:none; }
+  .count-line.empty { color:var(--accent); } .count-line.empty::before { background:var(--accent); }
+  /* entrada: letras sobem uma a uma, depois aparecem adesivos, texto e estado. "backwards" só vale
+     ANTES/DURANTE a animação, então não atrapalha o esmaecer da travessia (.hero.opening). */
+  .bigword span { display:inline-block; animation:letterIn .95s cubic-bezier(.2,.8,.2,1) backwards; animation-delay:calc(var(--i) * 55ms + .05s); }
+  .hero .stickers { animation:stickerIn .6s cubic-bezier(.2,.8,.2,1) .55s backwards; }
+  .hero .lead { animation:fadeUp .7s cubic-bezier(.2,.8,.2,1) .7s backwards; }
+  .hero .count-line { animation:fadeUp .7s cubic-bezier(.2,.8,.2,1) .82s backwards; }
+  body.intro .hero *, body.intro .hero { animation-play-state:paused !important; }   /* esperam a tela de carregamento */
+  @keyframes letterIn { from { opacity:0; transform:translateY(.32em); filter:blur(6px); } to { opacity:1; transform:none; filter:none; } }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+  @keyframes stickerIn { from { opacity:0; transform:translate(-50%, -10%); } to { opacity:1; transform:translate(-50%, -50%); } }
+  .hero h1, .hero .lead, .hero .count-line, .hero .stickers { transition:opacity .4s ease; }
+  .hero.opening .stickers { opacity:0; pointer-events:none; }
+  .hero.opening .lead, .hero.opening .count-line { opacity:.25; }
+
+  /* ---------- tela de carregamento (só na primeira visita da aba) ---------- */
+  #intro { position:fixed; inset:0; z-index:50; display:grid; place-items:center; background:#121216; color:#e8e8ea;
+    transition:clip-path .9s cubic-bezier(.7,0,.2,1); clip-path:inset(0 0 0 0); }
+  #intro.out { clip-path:inset(0 0 100% 0); }
+  .intro-box { width:min(380px, 84vw); }
+  .intro-kicker { margin:0 0 18px; text-align:center; font:500 10.5px/1 var(--mono); letter-spacing:.42em; text-transform:uppercase; color:#7b7b86; }
+  .intro-kicker i { font-style:normal; color:#4d6bff; }
+  .intro-num { display:flex; justify-content:center; align-items:flex-start; font:300 clamp(72px, 13vw, 104px)/1 "Segoe UI Variable Display","Segoe UI Light","Helvetica Neue",system-ui,sans-serif; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+  .intro-num sup { font-size:.26em; margin:.35em 0 0 .25em; color:#4d6bff; letter-spacing:0; }
+  .intro-bar { position:relative; height:1px; margin-top:26px; background:#2a2a33; }
+  .intro-bar i { position:absolute; left:0; top:0; height:1px; width:0; background:#4d6bff; box-shadow:0 0 8px #4d6bff; }
+  .intro-bar i::after { content:""; position:absolute; right:-3px; top:-3px; width:7px; height:7px; border-radius:50%; background:#7d93ff; box-shadow:0 0 10px 2px #4d6bff; }
+  .intro-foot { display:flex; justify-content:space-between; margin-top:12px; font:600 9.5px/1 var(--mono); letter-spacing:.24em; text-transform:uppercase; color:#666670; }
+  .intro-foot #introLabel { color:#4d6bff; }
+  .corner { position:fixed; width:12px; height:12px; border:0 solid #5a5a64; }
+  .corner.bl { left:26px; bottom:26px; border-left-width:1px; border-bottom-width:1px; }
+  .corner.br { right:26px; bottom:26px; border-right-width:1px; border-bottom-width:1px; }
+  main { position:relative; }   /* sem z-index: a palavra gigante do início fica ABAIXO da cena 3D */
+  footer, main > section:not([data-view="home"]), main > nav { position:relative; z-index:2; }
+  @keyframes viewIn { from { opacity:0; transform:translateY(16px) scale(.985); } to { opacity:1; transform:none; } }
+  @keyframes stepIn { from { opacity:0; transform:translateX(22px); } to { opacity:1; transform:none; } }
+  @keyframes popIn { from { opacity:0; transform:translateY(18px) scale(.96); } to { opacity:1; transform:none; } }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  @keyframes orbPulse { 0% { transform:scale(1); } 40% { transform:scale(1.14); } 100% { transform:scale(1); } }
+  /* o início fica de fora: uma animação no <section> criaria uma camada própria e a porta 3D
+     passaria a ser desenhada por cima dos botões. Ele tem a sua própria entrada (letras, botões). */
+  [data-view]:not([hidden]):not([data-view="home"]) { animation:viewIn .5s cubic-bezier(.2,.8,.2,1) both; }
+  [data-view]:not([hidden]) > .card:nth-of-type(2) { animation:viewIn .5s cubic-bezier(.2,.8,.2,1) .07s both; }
+  [data-view]:not([hidden]) > .card:nth-of-type(3) { animation:viewIn .5s cubic-bezier(.2,.8,.2,1) .14s both; }
+  [data-view]:not([hidden]) > .card:nth-of-type(4) { animation:viewIn .5s cubic-bezier(.2,.8,.2,1) .21s both; }
+  [data-step]:not([hidden]) { animation:stepIn .38s cubic-bezier(.2,.8,.2,1) both; }
+  .modal:not([hidden]) { animation:fadeIn .25s ease both; }
+  .modal:not([hidden]) .sheet { animation:popIn .35s cubic-bezier(.2,.8,.2,1) both; }
+  .toast:not([hidden]) { animation:popIn .3s cubic-bezier(.2,.8,.2,1) both; }
+  .msg:not(:empty) { animation:fadeIn .25s ease both; }
+  #door.open .orb { animation:orbPulse .6s cubic-bezier(.2,.8,.2,1); }
+  .thumb { animation:popIn .3s cubic-bezier(.2,.8,.2,1) both; }
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation-duration:.01ms !important; animation-delay:0s !important; transition-duration:.01ms !important; }
+  }
+
+  /* ---------- cabeçalho / rodapé ---------- */
+  header { position:sticky; top:0; z-index:5; border-bottom:1px solid var(--line); background:rgba(8,12,66,.8); backdrop-filter:blur(8px); }
+  .bar { max-width:980px; margin:auto; padding:11px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .brand-row { display:flex; align-items:center; gap:10px; background:none; border:0; padding:0; color:inherit; cursor:pointer; }
+  /* marca: palavra em caixa alta e peso pesado, com ponto colorido no fim */
+  .brand { font:900 21px/1 "Segoe UI Black","Arial Black",var(--display); letter-spacing:-.03em; } .brand b { color:#7df3ff; }
+  body[data-screen="home"] header { background:none; border-color:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  body[data-screen="home"] .bar { max-width:none; padding:18px clamp(16px, 2.6vw, 28px); }
+  body[data-screen="home"] main { padding-top:6px; padding-bottom:14px; }
+  .topnav { display:flex; align-items:center; gap:clamp(10px, 2.4vw, 28px); }
+  .topnav a { color:#fff; text-decoration:none; font-size:14px; font-weight:500; }
+  .topnav a:hover { text-decoration:underline; text-underline-offset:4px; }
+  .topnav a.pill { background:#fff; color:#141420; padding:10px 22px; border-radius:99px; }
+  .topnav a.pill:hover { text-decoration:none; background:var(--accent); }
+  .who { display:flex; align-items:center; gap:8px; }
+  .userpill { display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--line); border-radius:99px; padding:4px 12px 4px 4px; color:var(--text); cursor:pointer; font:inherit; font-size:13px; font-weight:600; }
+  .userpill:hover { border-color:var(--muted); }
+  .userpill .avatar { width:28px; height:28px; font-size:11px; }
+  main { flex:1; width:100%; max-width:980px; margin:0 auto; padding:22px 18px 40px; display:flex; flex-direction:column; }
+  main > section[data-view="home"]:not([hidden]) { flex:1; display:flex; flex-direction:column; justify-content:center; }
+  footer { max-width:980px; width:100%; margin:0 auto; padding:0 18px 22px; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .chip { background:var(--panel); border:1px solid var(--line); border-radius:99px; padding:4px 12px; font-size:12px; color:var(--muted); display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
+  .chip b { color:var(--text); font-weight:600; }
+  .chip .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:none; }
+  .chip.err { border-color:rgba(255,107,94,.6); color:var(--err); } .chip.err .dot { background:var(--err); box-shadow:none; }
+
+  /* ---------- base ---------- */
+  h1 { font:400 clamp(30px,5vw,42px)/1.1 var(--serif); letter-spacing:-.01em; margin:0 0 6px; }
+  h2 { font:400 24px/1.2 var(--serif); margin:0 0 4px; }
+  .lead { color:var(--muted); margin:0 0 20px; }
+  .muted { color:var(--muted); } .hint { font-weight:400; color:var(--muted); }
+  .card { background:rgba(12,17,82,.78); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid var(--line); border-radius:18px; padding:20px; margin-top:16px; }
+  .narrow { max-width:460px; margin-left:auto; margin-right:auto; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .notice { font-size:12px; color:var(--muted); margin:10px 0 0; }
+  .link { background:none; border:0; padding:0; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; }
+  .link:hover { text-decoration:underline; }
+  .msg { font-size:13px; min-height:18px; margin-top:12px; font-weight:600; } .msg:empty { min-height:0; margin:0; }
+  .ok { color:var(--ok); } .bad { color:var(--err); } .warn { color:var(--warn); }
+
+  /* ---------- botões ---------- */
+  button, .btn { font:inherit; font-weight:600; color:var(--text); cursor:pointer; border:1px solid var(--line); background:var(--panel2); border-radius:99px; padding:10px 20px; transition:.15s; display:inline-flex; align-items:center; justify-content:center; gap:8px; position:relative; }
+  button:hover:not(:disabled), .btn:hover { border-color:var(--muted); }
+  button:active:not(:disabled) { transform:scale(.97); }
+  button:focus-visible, .btn:focus-within, a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); box-shadow:none; }
+  button.go { background:var(--accent); border-color:transparent; color:#04121f; padding:13px 28px; font-size:16px; box-shadow:none; }
+  button.ghost, .btn.ghost { background:none; border-color:transparent; color:var(--muted); }
+  button.danger { color:var(--err); background:none; border-color:rgba(255,107,94,.45); }
+  button.danger:hover:not(:disabled) { background:rgba(255,107,94,.1); border-color:var(--err); }
+  button.block { width:100%; }
+  button:disabled { opacity:.35; cursor:not-allowed; box-shadow:none; }
+  .btn input[type=file] { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+
+  /* ---------- formulários ---------- */
+  label.l { display:block; font-weight:600; font-size:13px; margin:0 0 6px; }
+  .field { margin-bottom:14px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:560px) { .grid2 { grid-template-columns:1fr; } }
+  input[type=text], input[type=email], input[type=password] { width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:12px; background:var(--bg); color:var(--text); font:inherit; }
+  input::placeholder { color:#6f78d6; }
+  input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .segmented { display:grid; grid-template-columns:1fr 1fr; gap:6px; background:var(--bg); border:1px solid var(--line); border-radius:99px; padding:4px; }
+  .segmented label { position:relative; margin:0; text-align:center; padding:9px 8px; border-radius:99px; font-weight:600; color:var(--muted); cursor:pointer; transition:.15s; }
+  .segmented input { position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
+  .segmented label:has(input:checked) { background:var(--accent-soft); color:var(--accent); box-shadow:inset 0 0 0 1px rgba(255,209,102,.5); }
+  .segmented label:has(input[value=visitante]:checked) { background:rgba(150,165,255,.14); color:#aab4ff; box-shadow:inset 0 0 0 1px rgba(150,165,255,.55); }
+  .segmented label:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:1px; }
+  label.consent { display:flex; gap:10px; align-items:flex-start; font-size:13px; padding:12px 14px; border-radius:14px; background:rgba(240,166,64,.08); border:1px solid rgba(240,166,64,.35); cursor:pointer; margin:0; }
+  label.consent input { margin:2px 0 0; width:17px; height:17px; flex:none; accent-color:var(--accent); }
+
+  /* ---------- início ---------- */
+
+  /* ---------- cadastro em etapas ---------- */
+  .stepper { display:flex; align-items:center; gap:8px; margin:6px 0 4px; }
+  .stepper .s { display:flex; align-items:center; gap:8px; font:600 13px var(--display); color:var(--muted); }
+  .stepper .s i { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-style:normal; background:var(--panel2); border:1px solid var(--line); }
+  .stepper .s.active { color:var(--text); } .stepper .s.active i { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .stepper .s.done { color:var(--ok); } .stepper .s.done i { background:var(--ok); border-color:var(--ok); color:#06251a; }
+  .stepper .bar2 { flex:1; height:2px; background:var(--line); min-width:12px; }
+  @media (max-width:520px) { .stepper .s span { display:none; } .stepper .s.active span { display:inline; } }
+  .step-actions { display:flex; gap:10px; justify-content:space-between; margin-top:18px; flex-wrap:wrap; }
+  .review { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:14px; margin:0 0 16px; }
+  .review dt { color:var(--muted); } .review dd { margin:0; font-weight:600; word-break:break-word; }
+
+  /* ---------- câmera ---------- */
+  .stage { position:relative; width:100%; aspect-ratio:4/3; border-radius:16px; overflow:hidden; border:1px solid var(--line); background:radial-gradient(circle at 50% 38%, #10186e, #060833 72%); }
+  .stage video, .stage canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+  .placeholder { position:absolute; inset:0; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:var(--muted); font-size:14px; text-align:center; padding:24px; }
+  .placeholder svg { color:var(--accent); opacity:.55;  }
+  .frame { position:absolute; inset:9% 21%; pointer-events:none; opacity:.6; }
+  .frame i { position:absolute; width:28px; height:28px; border:3px solid var(--accent);  }
+  .frame i:nth-child(1) { top:0; left:0; border-right:0; border-bottom:0; border-radius:12px 0 0 0; }
+  .frame i:nth-child(2) { top:0; right:0; border-left:0; border-bottom:0; border-radius:0 12px 0 0; }
+  .frame i:nth-child(3) { bottom:0; left:0; border-right:0; border-top:0; border-radius:0 0 0 12px; }
+  .frame i:nth-child(4) { bottom:0; right:0; border-left:0; border-top:0; border-radius:0 0 12px 0; }
+  .scanline { position:absolute; left:21%; right:21%; top:9%; height:2px; display:none; background:linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent); box-shadow:none; }
+  .stage.scanning .scanline { display:block; animation:scan 1.4s ease-in-out infinite alternate; }
+  .stage.scanning .frame { opacity:1; }
+  .stage.good .frame i { border-color:var(--ok);  }
+  .stage.bad .frame i { border-color:var(--err);  }
+  @keyframes scan { from { top:9%; } to { top:91%; } }
+  @media (prefers-reduced-motion:reduce) { .stage.scanning .scanline { animation:none; top:50%; } }
+  .thumbs { display:flex; gap:8px; flex-wrap:wrap; } .thumbs:not(:empty) { margin-top:12px; }
+  .thumb { position:relative; }
+  .thumb img { width:58px; height:58px; object-fit:cover; border-radius:12px; display:block; border:1px solid rgba(255,209,102,.45); box-shadow:none; }
+  .thumb button { position:absolute; top:-7px; right:-7px; width:22px; height:22px; padding:0; font-size:13px; line-height:1; }
+  #photoCount { margin:12px 0 0; font-size:13px; color:var(--muted); }
+
+  /* ---------- conta: abas ---------- */
+  .tabs { display:flex; gap:6px; background:var(--panel); border:1px solid var(--line); border-radius:99px; padding:4px; width:max-content; margin:0 auto 6px; }
+  .tabs a { display:flex; align-items:center; gap:8px; padding:9px 22px; border-radius:99px; color:var(--muted); text-decoration:none; font-weight:600; font-size:14px; }
+  .tabs a.active { background:var(--accent-soft); color:var(--accent); box-shadow:inset 0 0 0 1px rgba(255,209,102,.5); }
+  @media (max-width:640px) {
+    .tabs { position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); width:auto; margin:0; z-index:6; justify-content:space-around; background:rgba(12,17,82,.94); backdrop-filter:blur(10px); box-shadow:0 8px 30px rgba(0,0,0,.5); }
+    .tabs a { flex:1; justify-content:center; }
+    main { padding-bottom:24px; }
+    body:has(#tabs:not([hidden])) footer { padding-bottom:calc(92px + env(safe-area-inset-bottom)); }
+  }
+
+  /* ---------- porta ---------- */
+  .greet { display:flex; align-items:center; gap:14px; margin-top:14px; }
+  .greet h1 { font-size:clamp(22px,4.5vw,28px); margin:0; }
+  .badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 9px; border-radius:99px; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); background:var(--accent-soft); border:1px solid rgba(255,209,102,.35); vertical-align:middle; }
+  .badge.visitante { color:#aab4ff; background:rgba(150,165,255,.14); border-color:rgba(150,165,255,.45); }
+  .avatar { width:52px; height:52px; border-radius:50%; display:grid; place-items:center; font:700 16px var(--display); flex:none; color:var(--accent); background:var(--accent-soft); border:1px solid rgba(255,209,102,.4); }
+  .avatar.visitante { color:#aab4ff; background:rgba(150,165,255,.14); border-color:rgba(150,165,255,.5); }
+  #door { display:flex; align-items:center; gap:16px; padding:18px; border-radius:20px; background:var(--panel2); border:1px solid var(--line); transition:.3s; }
+  #door .orb { width:70px; height:70px; border-radius:50%; flex:none; display:grid; place-items:center; color:var(--accent); background:var(--accent-soft); border:1px solid rgba(255,209,102,.45); box-shadow:none; transition:.3s; }
+  #door .orb .unlocked { display:none; }
+  #door .txt { flex:1; min-width:0; }
+  #doorState { font:800 22px var(--display); letter-spacing:.02em; }
+  #doorHow { font-size:13px; color:var(--muted); margin-top:1px; }
+  #door.open { border-color:rgba(61,220,151,.55); box-shadow:none; }
+  #door.open .orb { color:var(--ok); background:rgba(61,220,151,.12); border-color:rgba(61,220,151,.6); box-shadow:none; }
+  #door.open .orb .locked { display:none; } #door.open .orb .unlocked { display:block; }
+  #door.open #doorState { color:var(--ok); }
+  .doorbar { height:6px; background:var(--panel); border-radius:6px; overflow:hidden; margin-top:10px; }
+  .doorbar i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--ok), #9bf2cb); transition:width .25s linear; }
+  .openrow { display:flex; align-items:center; gap:12px; margin-top:18px; }
+  .slider { position:relative; flex:1; height:64px; border-radius:99px; background:var(--panel2); border:1px solid var(--line); overflow:hidden; user-select:none; -webkit-user-select:none; }
+  .slider-fill { position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg, rgba(255,209,102,.35), rgba(150,165,255,.45)); }
+  .slider-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding-left:56px; font-weight:600; color:var(--muted); pointer-events:none; letter-spacing:.01em; }
+  .slider-label::after { content:""; position:absolute; inset:0; background:linear-gradient(100deg, transparent 35%, rgba(255,255,255,.14) 50%, transparent 65%); background-size:250% 100%; animation:shine 2.6s linear infinite; mix-blend-mode:overlay; }
+  @keyframes shine { from { background-position:150% 0; } to { background-position:-100% 0; } }
+  @media (prefers-reduced-motion:reduce) { .slider-label::after { animation:none; } }
+  .slider-thumb { position:absolute; left:4px; top:4px; width:54px; height:54px; border-radius:50%; display:grid; place-items:center; cursor:grab; touch-action:none; color:#04121f; background:var(--accent); box-shadow:none; }
+  .slider-thumb:active { cursor:grabbing; }
+  .slider:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+  .slider.done .slider-label { color:var(--ok); padding-left:0; padding-right:56px; }
+  .slider.done .slider-label::after { display:none; }
+  .camfab { width:64px; height:64px; border-radius:50%; padding:0; flex:none; color:var(--accent); background:var(--accent-soft); border:1px solid rgba(255,209,102,.5); box-shadow:none; }
+  .camfab:hover:not(:disabled) { box-shadow:none; border-color:var(--accent); }
+  .opentip { text-align:center; font-size:12px; color:var(--muted); margin:10px 0 0; }
   ul { list-style:none; padding:0; margin:0; }
-  li { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); gap:8px; }
-  li small { color:var(--muted); }
-  .muted { color:var(--muted); }
-  .notice { font-size:.8rem; color:var(--muted); margin-top:12px; }
+  #log li { display:flex; justify-content:space-between; gap:12px; align-items:baseline; font-size:13px; padding:8px 0 8px 18px; border-bottom:1px solid var(--line); position:relative; }
+  #log li:last-child { border-bottom:0; }
+  #log li::before { content:""; position:absolute; left:2px; top:14px; width:8px; height:8px; border-radius:50%; background:var(--line); }
+  #log li.ok::before { background:var(--ok); box-shadow:none; } #log li.bad::before { background:var(--err); box-shadow:none; }
+  #log li.empty { padding-left:0; color:var(--muted); } #log li.empty::before { display:none; }
+  #log .t { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; flex:none; }
+
+  /* ---------- modal do rosto ---------- */
+  .modal { position:fixed; inset:0; z-index:10; background:rgba(3,4,26,.88); backdrop-filter:blur(6px); display:grid; place-items:center; padding:14px; }
+  .sheet { width:min(520px,100%); background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:18px; box-shadow:0 20px 60px rgba(0,0,0,.6); max-height:100%; overflow:auto; }
+  .sheet h2 { text-align:center; }
+  #fuMsg { text-align:center; font-weight:600; margin:14px 0 4px; min-height:24px; }
+  .sheet .row { justify-content:center; margin-top:10px; }
+
+  /* ---------- perfil ---------- */
+  .profile-head { display:flex; align-items:center; gap:16px; }
+  .profile-head .avatar { width:64px; height:64px; font-size:20px; }
+  .profile-head h1 { font-size:clamp(22px,4.5vw,28px); margin:0; word-break:break-word; }
+  .profile-head p { margin:2px 0 0; color:var(--muted); font-size:14px; word-break:break-all; }
+  .danger-zone { border-color:rgba(255,107,94,.35); }
+  .toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%); background:var(--panel2); border:1px solid rgba(255,209,102,.4); border-radius:12px; padding:10px 18px; font-size:14px; z-index:20; max-width:90vw; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  #doorState { display:inline-flex; align-items:center; gap:9px; padding:9px 15px; border-radius:10px; background:var(--accent); color:var(--accent-ink);
+    font:900 14px/1 "Arial Black","Segoe UI Black",system-ui,sans-serif; letter-spacing:.07em; box-shadow:0 4px 0 rgba(0,0,0,.35); }
+  #doorState::before { content:""; width:9px; height:9px; border-radius:50%; background:var(--accent-ink); }
+  #door.open #doorState { background:var(--ok); color:#04210f; } #door.open #doorState::before { background:#04210f; }
+  #doorHow { margin-top:8px; }
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 </style>
 </head>
 <body>
+<canvas id="bg3d" aria-hidden="true"></canvas>
+
+<!-- tela de carregamento: aparece uma vez por aba e acompanha o que de fato carrega
+     (fontes, configuração do servidor e a cena 3D); some sozinha mesmo se algo falhar -->
+<div id="intro" aria-hidden="true" hidden>
+  <div class="intro-box">
+    <p class="intro-kicker">Abrindo a portaria <i>—</i> aguarde</p>
+    <div class="intro-num"><span id="introNum">0</span><sup>%</sup></div>
+    <div class="intro-bar"><i id="introBar"></i></div>
+    <div class="intro-foot"><span id="introLabel">Carregando</span><span><span id="introNum2">0</span> / 100</span></div>
+  </div>
+  <i class="corner bl"></i><i class="corner br"></i>
+</div>
+<script>
+  // decide antes da primeira pintura, para a página não piscar por trás
+  (function () {
+    let seen = false;
+    try { seen = sessionStorage.getItem("portaria:intro") === "1"; sessionStorage.setItem("portaria:intro", "1"); } catch (e) { seen = true; }
+    if (seen || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    document.getElementById("intro").hidden = false; document.body.classList.add("intro");
+  })();
+</script>
+
 <header>
-  <h1>Reconhecedor Facial</h1>
-  <p>Processamento 100% local. Imagens não são enviadas para nenhum serviço externo.</p>
-</header>
-<main>
-  <section class="card">
-    <h2>Câmera</h2>
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="canvas" hidden></canvas>
-    <div class="row">
-      <button id="btnStart">Ligar câmera</button>
-      <button id="btnRecognize" class="primary" disabled>Reconhecer</button>
-      <label class="muted">ou arquivo: <input id="fileRecognize" type="file" accept="image/*"></label>
+  <div class="bar">
+    <button class="brand-row" id="brandBtn" aria-label="Início">
+      <span class="brand">PORTARIA<b>.</b></span>
+    </button>
+    <nav class="topnav" id="topnav" aria-label="Acesso">
+      <a href="#/entrar" id="navLogin">Entrar</a>
+      <a href="#/cadastro" class="pill" id="navRegister">Cadastrar-se</a>
+    </nav>
+    <div class="who" id="who" hidden>
+      <button class="userpill" id="userPill" title="Meu perfil"><span class="avatar" id="pillAvatar"></span><span id="pillName"></span></button>
+      <button class="ghost" id="btnLogout">Sair</button>
     </div>
-    <div id="result" aria-live="polite"></div>
+  </div>
+</header>
+
+<main>
+  <!-- ======================= INÍCIO ======================= -->
+  <section data-view="home">
+    <div class="hero" id="hero">
+      <h1 class="sr-only">Portaria Facial — bem-vindo</h1>
+      <div class="hero-door">
+        <div class="bigword" aria-hidden="true"><span style="--i:0">P</span><span style="--i:1">O</span><span style="--i:2">R</span><span style="--i:3">T</span><span style="--i:4">A</span><span style="--i:5">R</span><span style="--i:6">I</span><span style="--i:7">A</span></div>
+        <div class="fog" aria-hidden="true"></div>
+        <div class="doorway" id="doorAnchor"></div>
+        <div class="stickers">
+          <button class="sticker" id="goLogin">Entrar</button>
+          <button class="sticker mirror" id="goRegister">Cadastrar-se</button>
+        </div>
+      </div>
+      <p class="lead">Abra a porta do condomínio com o seu rosto ou com um deslize. Tudo é processado neste computador.</p>
+      <div class="count-line" id="countLine"></div>
+    </div>
   </section>
 
-  <section class="card">
-    <h2>Cadastro</h2>
-    <div class="row">
-      <input id="name" type="text" placeholder="Nome da pessoa">
+  <!-- ======================= LOGIN ======================= -->
+  <section data-view="login" hidden>
+    <div class="card narrow">
+      <h2>Entrar</h2>
+      <p class="muted" style="margin:0 0 18px">Use o e-mail e a senha do seu cadastro.</p>
+      <form id="loginForm" novalidate>
+        <div class="field"><label class="l" for="lEmail">E-mail</label><input id="lEmail" type="email" placeholder="voce@exemplo.com" autocomplete="email" maxlength="254"></div>
+        <div class="field"><label class="l" for="lPass">Senha</label><input id="lPass" type="password" placeholder="Sua senha" autocomplete="current-password" maxlength="128"></div>
+        <button class="go block" id="btnLogin" type="submit">Entrar</button>
+        <div id="loginMsg" class="msg" aria-live="polite"></div>
+      </form>
+      <p class="notice" style="text-align:center">Ainda não tem conta? <button class="link" data-go="#/cadastro">Cadastre-se</button> · <button class="link" data-go="#/">Voltar</button></p>
     </div>
-    <div class="row">
-      <button id="btnCapture" disabled>Capturar foto da câmera</button>
-      <label class="muted">ou arquivos: <input id="fileEnroll" type="file" accept="image/*" multiple></label>
-    </div>
-    <div class="thumbs" id="thumbs"></div>
-    <div class="row">
-      <button id="btnEnroll" class="primary">Cadastrar</button>
-      <button id="btnClear">Limpar fotos</button>
-    </div>
-    <div id="enrollMsg" class="muted" aria-live="polite"></div>
+  </section>
 
-    <h2 style="margin-top:20px">Pessoas cadastradas</h2>
-    <p id="personsMsg" class="muted"></p>
-    <ul id="persons"></ul>
-    <p class="notice">Excluir remove o cadastro, todos os embeddings e qualquer foto armazenada.</p>
+  <!-- ======================= CADASTRO ======================= -->
+  <section data-view="register" hidden>
+    <div class="card narrow" style="max-width:560px">
+      <div class="stepper" id="stepper">
+        <div class="s" data-s="1"><i>1</i><span>Rosto</span></div><div class="bar2"></div>
+        <div class="s" data-s="2"><i>2</i><span>Seus dados</span></div><div class="bar2"></div>
+        <div class="s" data-s="3"><i>3</i><span>Confirmar</span></div>
+      </div>
+
+      <!-- etapa 1: escanear o rosto -->
+      <div data-step="1">
+        <h2 style="margin-top:14px">Escaneie o seu rosto</h2>
+        <p class="muted" style="margin:0 0 14px">Olhe para a câmera, com boa luz e sem ninguém ao fundo. O escaneamento tira 5 fotos seguidas.</p>
+        <div class="stage" id="regStage">
+          <div class="placeholder" id="regPlaceholder">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10.5 20 7v10l-5-3.5"/><rect x="3" y="6" width="12" height="12" rx="2.5"/></svg>
+            <span id="regPlaceholderText">Ligando a câmera…</span>
+          </div>
+          <video id="regVideo" autoplay playsinline muted hidden></video>
+          <canvas id="regOverlay"></canvas>
+          <div class="frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="scanline" aria-hidden="true"></div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="primary" id="btnScan">Escanear rosto</button>
+          <label class="btn" title="Usar fotos já tiradas">Enviar fotos<input id="regFiles" type="file" accept="image/*" multiple></label>
+          <button class="ghost" id="btnRegClear">Limpar</button>
+        </div>
+        <div class="thumbs" id="thumbs"></div>
+        <p id="photoCount">Nenhuma foto ainda.</p>
+        <div id="regMsg1" class="msg" aria-live="polite"></div>
+        <div class="step-actions"><button class="ghost" data-go="#/">Cancelar</button><button class="go" id="btnNext1" disabled>Próximo</button></div>
+      </div>
+
+      <!-- etapa 2: dados -->
+      <div data-step="2" hidden>
+        <h2 style="margin-top:14px">Seus dados</h2>
+        <p class="muted" style="margin:0 0 14px">Com o e-mail e a senha você entra depois na sua conta.</p>
+        <div class="field"><label class="l" for="rName">Nome</label><input id="rName" type="text" placeholder="Nome completo" maxlength="100" autocomplete="name"></div>
+        <div class="field"><label class="l" for="rUnit">Apartamento / bloco <span class="hint">(opcional)</span></label><input id="rUnit" type="text" placeholder="Ex.: 101 B" maxlength="30" autocomplete="off"></div>
+        <div class="field"><span class="l" style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">Você é</span>
+          <div class="segmented"><label><input type="radio" name="rKind" value="morador" checked>Morador</label><label><input type="radio" name="rKind" value="visitante">Visitante</label></div></div>
+        <div class="field"><label class="l" for="rEmail">E-mail</label><input id="rEmail" type="email" placeholder="voce@exemplo.com" autocomplete="email" maxlength="254"></div>
+        <div class="grid2">
+          <div class="field"><label class="l" for="rPass">Senha <span class="hint">(mín. 8)</span></label><input id="rPass" type="password" autocomplete="new-password" maxlength="128"></div>
+          <div class="field"><label class="l" for="rPass2">Repita a senha</label><input id="rPass2" type="password" autocomplete="new-password" maxlength="128"></div>
+        </div>
+        <div id="regMsg2" class="msg" aria-live="polite"></div>
+        <div class="step-actions"><button class="ghost" id="btnBack2">Voltar</button><button class="go" id="btnNext2">Próximo</button></div>
+      </div>
+
+      <!-- etapa 3: confirmar -->
+      <div data-step="3" hidden>
+        <h2 style="margin-top:14px">Confirmar cadastro</h2>
+        <dl class="review" id="review"></dl>
+        <label class="consent"><input type="checkbox" id="rConsent"><span>Eu <b>autorizo</b> o uso da minha imagem e do meu embedding facial para o controle de acesso desta portaria, e posso excluir a minha conta (e esses dados) a qualquer momento.</span></label>
+        <div id="regMsg3" class="msg" aria-live="polite"></div>
+        <div class="step-actions"><button class="ghost" id="btnBack3">Voltar</button><button class="go" id="btnFinish">Concluir cadastro</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= CONTA ======================= -->
+  <nav class="tabs" id="tabs" hidden aria-label="Seções da conta">
+    <a href="#/conta" id="tabDoor"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Porta</a>
+    <a href="#/perfil" id="tabProfile"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Usuário</a>
+  </nav>
+
+  <section data-view="door" hidden>
+    <div class="greet">
+      <div class="avatar" id="dAvatar" aria-hidden="true"></div>
+      <div><h1 id="dGreet">Olá</h1><div id="dMeta" class="muted"></div></div>
+    </div>
+
+    <div class="card">
+      <div id="door" aria-live="polite">
+        <div class="orb" aria-hidden="true">
+          <svg class="locked" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          <svg class="unlocked" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>
+        </div>
+        <div class="txt">
+          <div id="doorState">PORTA TRANCADA</div>
+          <div id="doorHow">Deslize ou use a câmera para abrir.</div>
+          <div class="doorbar" aria-hidden="true"><i id="doorBar"></i></div>
+        </div>
+      </div>
+
+      <div class="openrow">
+        <div class="slider" id="slider" role="button" tabindex="0" aria-label="Deslize para abrir a porta. Também funciona com Enter.">
+          <div class="slider-fill" id="sliderFill"></div>
+          <div class="slider-label" id="sliderLabel">Deslize para abrir</div>
+          <div class="slider-thumb" id="sliderThumb" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </div>
+        </div>
+        <button class="camfab" id="btnCam" title="Abrir com o rosto" aria-label="Abrir a porta com o rosto">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="10" r="3"/><path d="M7.5 17a4.5 4.5 0 0 1 9 0"/></svg>
+        </button>
+      </div>
+      <p class="opentip">Deslize para abrir · ou toque na câmera para abrir com o rosto</p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:6px">Últimas aberturas</h2>
+      <ul id="log"><li class="empty">Nenhuma abertura nesta sessão.</li></ul>
+      <p class="notice">A porta é simulada (não há fechadura conectada). Este histórico existe só nesta tela: não é gravado em disco e some ao recarregar a página.</p>
+    </div>
+  </section>
+
+  <section data-view="profile" hidden>
+    <div class="card" style="margin-top:14px">
+      <div class="profile-head">
+        <div class="avatar" id="pAvatar" aria-hidden="true"></div>
+        <div><h1 id="pName">Usuário</h1><p id="pMeta"></p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Informações pessoais</h2>
+      <p class="muted" style="margin:0 0 16px">Altere seus dados. Para trocar o e-mail, confirme a senha atual.</p>
+      <div class="field"><label class="l" for="eName">Nome</label><input id="eName" type="text" maxlength="100" autocomplete="name"></div>
+      <div class="grid2">
+        <div class="field"><label class="l" for="eUnit">Apartamento / bloco</label><input id="eUnit" type="text" maxlength="30" autocomplete="off"></div>
+        <div class="field"><span class="l" style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">Você é</span>
+          <div class="segmented"><label><input type="radio" name="eKind" value="morador">Morador</label><label><input type="radio" name="eKind" value="visitante">Visitante</label></div></div>
+      </div>
+      <div class="field"><label class="l" for="eEmail">E-mail</label><input id="eEmail" type="email" maxlength="254" autocomplete="email"></div>
+      <div class="field" id="eCurrentWrap" hidden><label class="l" for="eCurrent">Senha atual <span class="hint">(necessária para trocar o e-mail)</span></label><input id="eCurrent" type="password" autocomplete="current-password" maxlength="128"></div>
+      <button class="primary" id="btnSaveProfile">Salvar alterações</button>
+      <div id="profileMsg" class="msg" aria-live="polite"></div>
+    </div>
+
+    <div class="card">
+      <h2>Alterar senha</h2>
+      <div class="field" style="margin-top:12px"><label class="l" for="wCurrent">Senha atual</label><input id="wCurrent" type="password" autocomplete="current-password" maxlength="128"></div>
+      <div class="grid2">
+        <div class="field"><label class="l" for="wNew">Nova senha <span class="hint">(mín. 8)</span></label><input id="wNew" type="password" autocomplete="new-password" maxlength="128"></div>
+        <div class="field"><label class="l" for="wNew2">Repita a nova senha</label><input id="wNew2" type="password" autocomplete="new-password" maxlength="128"></div>
+      </div>
+      <button id="btnChangePw">Alterar senha</button>
+      <div id="pwMsg" class="msg" aria-live="polite"></div>
+    </div>
+
+    <div class="card danger-zone">
+      <h2>Excluir minha conta</h2>
+      <p class="muted" style="margin:0 0 14px">Remove o seu cadastro, o seu e-mail, a senha e todos os embeddings do seu rosto (direito à eliminação dos dados). Depois disso você não abre mais a porta pelo rosto.</p>
+      <div class="row"><button class="danger" id="btnDelete">Excluir minha conta</button><button class="ghost" id="btnLogout2">Sair</button></div>
+      <div id="delMsg" class="msg" aria-live="polite"></div>
+    </div>
   </section>
 </main>
+
+<footer id="status"></footer>
+
+<!-- ======================= ABRIR COM O ROSTO ======================= -->
+<div class="modal" id="faceModal" hidden role="dialog" aria-modal="true" aria-label="Abrir com o rosto">
+  <div class="sheet">
+    <h2>Abrir com o rosto</h2>
+    <div class="stage" id="fuStage" style="margin-top:12px">
+      <div class="placeholder" id="fuPlaceholder"><span>Ligando a câmera…</span></div>
+      <video id="fuVideo" autoplay playsinline muted hidden></video>
+      <canvas id="fuOverlay"></canvas>
+      <div class="frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="scanline" aria-hidden="true"></div>
+    </div>
+    <div id="fuMsg" aria-live="polite"></div>
+    <div class="row"><button id="fuRetry" class="primary" hidden>Tentar de novo</button><button id="fuClose">Cancelar</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<canvas id="grab" hidden></canvas>
+
 <script>
 const $ = (id) => document.getElementById(id);
-const video = $("video"), canvas = $("canvas");
-let captured = [];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const KIND_LABEL = { morador: "Morador", visitante: "Visitante" };
+const SCAN_SHOTS = 5, SCAN_INTERVAL_MS = 600, MAX_PHOTOS = 10;
+const UNLOCK_TRIES = 10, UNLOCK_INTERVAL_MS = 700;
+const FACE_ERRORS = ["no_face", "multiple_faces", "low_quality", "inconsistent_enrollment", "duplicate_person", "invalid_image"];
+let me = null;              // perfil da pessoa logada (null = sem sessão)
+let doorTimer = null, doorUntil = 0, doorTotalMs = 1;
 
-async function startCamera() {
+// ---------------------------------------------------------------- utilitários
+// Avisa o fundo 3D (scene.js) sobre o que acontece no fluxo. Se a cena não carregou, não faz nada.
+function fx(name, detail) { document.dispatchEvent(new CustomEvent("portaria:" + name, { detail: detail || {} })); }
+
+function setMsg(el, text, kind) { el.textContent = text; el.className = "msg" + (kind ? " " + kind : ""); }
+
+function toast(text) {
+  const t = $("toast"); t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.hidden = true), 3500);
+}
+
+// Faz a requisição e devolve {ok, status, data}; nunca lança — erros de rede viram mensagem.
+async function api(url, options) {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
-    video.srcObject = stream;
-    $("btnRecognize").disabled = false; $("btnCapture").disabled = false;
-  } catch (e) { showResult("Não foi possível acessar a câmera: " + e.message, false); }
+    const r = await fetch(url, options);
+    let data = {};
+    if (r.status !== 204) {
+      try { data = await r.json(); } catch { data = { message: `Resposta inválida do servidor (${r.status}).` }; }
+    }
+    if (r.status === 401 && url.startsWith("/api/me")) sessionExpired();
+    return { ok: r.ok, status: r.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, data: { code: "network", message: "Servidor indisponível. Ele está rodando?" } };
+  }
 }
 
-function frameBlob() {
-  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
-  return new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.92));
+function form(fields) { const fd = new FormData(); for (const [k, v] of Object.entries(fields)) fd.append(k, v); return fd; }
+function initials(name) {
+  const p = (name || "").trim().split(/\s+/).filter(Boolean);
+  return p.length ? (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase() : "?";
+}
+function kindBadge(kind) {
+  const s = document.createElement("span"); s.className = "badge " + (kind === "visitante" ? "visitante" : "");
+  s.textContent = KIND_LABEL[kind] || kind; return s;
+}
+function paintAvatar(el, p) { el.textContent = initials(p.name); el.className = el.className.replace(/\bvisitante\b/, "").trim() + (p.kind === "visitante" ? " visitante" : ""); }
+
+// ---------------------------------------------------------------- câmera (uma por vez)
+const camera = {
+  stream: null, video: null,
+  async start(video) {
+    this.stop();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+      throw new Error("O navegador só libera a câmera em localhost ou em HTTPS (veja o README).");
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } });
+    } catch (e) {
+      const known = {
+        NotAllowedError: "Permissão da câmera negada. Libere o acesso no navegador.",
+        NotFoundError: "Nenhuma câmera encontrada neste aparelho.",
+        NotReadableError: "A câmera está em uso por outro programa.",
+      };
+      throw new Error(known[e.name] || "Não foi possível ligar a câmera.");
+    }
+    video.srcObject = this.stream; this.video = video;
+    await new Promise((res) => (video.readyState >= 2 ? res() : video.addEventListener("loadeddata", res, { once: true })));
+    video.hidden = false;
+  },
+  stop() {
+    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    if (this.video) { this.video.srcObject = null; this.video.hidden = true; }
+    this.stream = null; this.video = null;
+  },
+  frame() {
+    const g = $("grab"), v = this.video;
+    g.width = v.videoWidth; g.height = v.videoHeight;
+    g.getContext("2d").drawImage(v, 0, 0);
+    return new Promise((res) => g.toBlob(res, "image/jpeg", 0.92));
+  },
+};
+
+// Caixa da face sobre o vídeo (object-fit: contain => calcula escala e faixas pretas)
+function drawBox(canvas, box, label, ok, srcW, srcH) {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, w, h);
+  if (!box || !srcW) return;
+  const s = Math.min(w / srcW, h / srcH), ox = (w - srcW * s) / 2, oy = (h - srcH * s) / 2;
+  const [x1, y1, x2, y2] = box.map((v, i) => (i % 2 === 0 ? ox + v * s : oy + v * s));
+  const color = ok ? "#3ddc97" : "#ff6b5e";
+  ctx.lineWidth = 3; ctx.strokeStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.roundRect(x1, y1, x2 - x1, y2 - y1, 10); ctx.stroke(); ctx.shadowBlur = 0;
+  ctx.font = "600 14px 'Segoe UI', system-ui, sans-serif";
+  const tw = ctx.measureText(label).width + 18, ty = y1 > 32 ? y1 - 30 : y2 + 6;
+  ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x1, ty, tw, 24, 12); ctx.fill();
+  ctx.fillStyle = "#04121f"; ctx.fillText(label, x1 + 9, ty + 17);
 }
 
-function showResult(text, ok) {
-  const el = $("result"); el.textContent = text;
-  el.className = ok === undefined ? "" : (ok ? "ok" : "bad");
+// ---------------------------------------------------------------- roteamento
+const ROUTES = { "": "home", "#": "home", "#/": "home", "#/entrar": "login", "#/cadastro": "register", "#/conta": "door", "#/perfil": "profile" };
+const PUBLIC_VIEWS = new Set(["home", "login", "register"]);
+let currentView = null;
+
+function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
+
+function render() {
+  const name = ROUTES[location.hash] || "home";
+  if (me && PUBLIC_VIEWS.has(name)) return go("#/conta");
+  if (!me && !PUBLIC_VIEWS.has(name)) return go("#/entrar");
+  if (currentView && currentView !== name) leaveView(currentView);
+  document.querySelectorAll("[data-view]").forEach((s) => (s.hidden = s.dataset.view !== name));
+  $("tabs").hidden = !me || PUBLIC_VIEWS.has(name);
+  $("tabDoor").classList.toggle("active", name === "door");
+  $("tabProfile").classList.toggle("active", name === "profile");
+  $("who").hidden = !me;
+  $("topnav").hidden = !!me;
+  document.body.dataset.screen = name;   // não é "data-view": esse marca as seções que o roteador mostra/esconde
+  if (me) { $("pillName").textContent = me.name.split(" ")[0]; paintAvatar($("pillAvatar"), me); }
+  const enter = { home: enterHome, login: enterLogin, register: enterRegister, door: enterDoor, profile: enterProfile }[name];
+  currentView = name;
+  window.__portariaView = name; fx("view", { name });
+  window.scrollTo(0, 0);
+  enter();
 }
 
-async function recognize(blob) {
-  const fd = new FormData(); fd.append("file", blob, "frame.jpg");
-  showResult("Reconhecendo…");
-  const r = await fetch("/api/recognize", { method: "POST", body: fd });
-  const data = await r.json();
-  // mostra score x threshold para entender por que foi aceito/rejeitado
-  const detail = (r.ok && data.score !== null && data.score !== undefined)
-    ? ` — score ${data.score.toFixed(3)} / threshold ${data.threshold.toFixed(3)}` : "";
-  showResult(data.message + detail, r.ok && data.recognized);
+function leaveView(name) {
+  if (name === "register") { camera.stop(); fx("scan", { active: false }); }
+  if (name === "door") closeFaceModal();
+}
+
+function sessionExpired() {
+  if (!me) return;
+  me = null; toast("Sua sessão expirou. Entre de novo."); go("#/entrar");
+}
+
+// ---------------------------------------------------------------- status (rodapé e início)
+async function loadStatus() {
+  const { ok, data } = await api("/api/status");
+  const el = $("status"); el.replaceChildren();
+  const chip = (label, value, cls, dot) => {
+    const c = document.createElement("span"); c.className = "chip" + (cls ? " " + cls : "");
+    if (dot) { const d = document.createElement("span"); d.className = "dot"; c.appendChild(d); }
+    if (label) c.append(label + " ");
+    if (value !== undefined) { const b = document.createElement("b"); b.textContent = value; c.appendChild(b); }
+    return c;
+  };
+  if (!ok) { el.appendChild(chip(data.message || "Não foi possível carregar a configuração.", undefined, "err", true)); return; }
+  el.append(chip("", "Local", "", true), chip("Modelo", data.model), chip("Comparador", data.matcher), chip("Threshold", data.threshold.toFixed(2)));
+  const line = $("countLine"); line.textContent = data.message;
+  line.className = "count-line" + (data.n_persons === 0 ? " empty" : "");
+}
+
+// ---------------------------------------------------------------- início e login
+function enterHome() { $("hero").classList.remove("opening"); loadStatus(); }
+
+// Clique em Entrar/Cadastrar-se: a porta 3D abre, libera os pontos e a câmera a atravessa; só
+// então a tela troca. Sem a cena 3D (ou com "reduzir movimento") a troca é imediata.
+const DOOR_TRAVEL_MS = 900;
+let travelling = false;
+function enterThrough(hash) {
+  const animated = document.body.classList.contains("has3d") && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!animated) return go(hash);
+  if (travelling) return;
+  travelling = true;
+  $("hero").classList.add("opening"); fx("enter");
+  setTimeout(() => { travelling = false; go(hash); }, DOOR_TRAVEL_MS);
+}
+
+function enterLogin() { setMsg($("loginMsg"), ""); $("lPass").value = ""; $("lEmail").focus(); }
+
+async function doLogin(e) {
+  e.preventDefault();
+  const email = $("lEmail").value.trim(), password = $("lPass").value;
+  if (!email || !password) return setMsg($("loginMsg"), "Informe o e-mail e a senha.", "warn");
+  setMsg($("loginMsg"), "Entrando…"); $("btnLogin").disabled = true;
+  const { ok, data } = await api("/api/auth/login", { method: "POST", body: form({ email, password }) });
+  $("btnLogin").disabled = false;
+  if (!ok) { fx("flash", { kind: "bad" }); return setMsg($("loginMsg"), data.message || "Não foi possível entrar.", data.code === "too_many_attempts" ? "warn" : "bad"); }
+  me = data; $("lPass").value = ""; fx("flash", { kind: "ok" }); go("#/conta");
+}
+
+async function doLogout() {
+  await api("/api/auth/logout", { method: "POST" });
+  me = null; doorUntil = 0; renderDoor(); go("#/");   // a porta não fica "aberta" para o próximo usuário
+}
+
+// ---------------------------------------------------------------- cadastro em etapas
+const reg = { step: 1, shots: [], scanning: false };
+
+function enterRegister() {
+  reg.step = 1; reg.shots = []; reg.scanning = false;
+  $("regFiles").value = "";
+  ["rName", "rUnit", "rEmail", "rPass", "rPass2"].forEach((id) => ($(id).value = ""));
+  document.querySelector('input[name="rKind"][value="morador"]').checked = true;
+  $("rConsent").checked = false;
+  ["regMsg1", "regMsg2", "regMsg3"].forEach((id) => setMsg($(id), ""));
+  renderThumbs(); setStep(1);
+}
+
+function photoCount() { return reg.shots.length + $("regFiles").files.length; }
+
+function setStep(n) {
+  reg.step = n;
+  document.querySelectorAll("[data-step]").forEach((s) => (s.hidden = Number(s.dataset.step) !== n));
+  document.querySelectorAll("#stepper .s").forEach((s) => {
+    const i = Number(s.dataset.s); s.classList.toggle("active", i === n); s.classList.toggle("done", i < n);
+    s.querySelector("i").textContent = i < n ? "✓" : String(i);
+  });
+  if (n === 1) startRegCamera(); else camera.stop();
+  if (n === 3) fillReview();
+}
+
+async function startRegCamera() {
+  $("regPlaceholder").hidden = false; $("regPlaceholderText").textContent = "Ligando a câmera…";
+  try { await camera.start($("regVideo")); $("regPlaceholder").hidden = true; }
+  catch (e) { $("regPlaceholderText").textContent = e.message; }
 }
 
 function renderThumbs() {
-  $("thumbs").innerHTML = "";
-  captured.forEach((b) => { const img = document.createElement("img"); img.src = URL.createObjectURL(b); $("thumbs").appendChild(img); });
+  const box = $("thumbs"); box.replaceChildren();
+  reg.shots.forEach((b, i) => {
+    const d = document.createElement("div"); d.className = "thumb";
+    const img = document.createElement("img"); img.src = URL.createObjectURL(b); img.alt = `foto ${i + 1}`;
+    const rm = document.createElement("button"); rm.textContent = "×"; rm.title = "Remover"; rm.setAttribute("aria-label", `Remover foto ${i + 1}`);
+    rm.onclick = () => { reg.shots.splice(i, 1); renderThumbs(); };
+    d.append(img, rm); box.appendChild(d);
+  });
+  const n = photoCount();
+  if (!reg.scanning) $("photoCount").textContent = n ? `${n} foto(s) do rosto. Remova alguma ruim (×) ou escaneie de novo.` : "Nenhuma foto ainda.";
+  $("btnNext1").disabled = n === 0 || reg.scanning;
+  $("btnScan").textContent = reg.shots.length ? "Escanear de novo" : "Escanear rosto";
 }
 
-async function enroll() {
-  const name = $("name").value.trim();
-  const files = [...captured, ...$("fileEnroll").files];
-  if (!name || files.length === 0) { $("enrollMsg").textContent = "Informe o nome e ao menos uma foto."; return; }
-  const fd = new FormData(); fd.append("name", name);
-  files.forEach((f, i) => fd.append("files", f, f.name || `captura_${i}.jpg`));
-  $("enrollMsg").textContent = "Cadastrando…";
-  const r = await fetch("/api/persons", { method: "POST", body: fd });
-  const data = await r.json();
-  $("enrollMsg").textContent = data.message;
-  if (r.ok) { captured = []; renderThumbs(); $("fileEnroll").value = ""; $("name").value = ""; loadPersons(); }
+async function scanFace() {
+  if (reg.scanning) return;
+  if (!camera.stream) { await startRegCamera(); if (!camera.stream) return; }
+  reg.scanning = true; reg.shots = []; $("btnScan").disabled = true; $("btnNext1").disabled = true;
+  setMsg($("regMsg1"), ""); $("regStage").classList.add("scanning"); fx("scan", { active: true }); renderThumbs();
+  for (let i = 1; i <= SCAN_SHOTS && reg.shots.length < MAX_PHOTOS; i++) {
+    $("photoCount").textContent = `Escaneando… foto ${i} de ${SCAN_SHOTS}. Mova levemente o rosto.`;
+    await sleep(SCAN_INTERVAL_MS);
+    reg.shots.push(await camera.frame()); renderThumbs();
+  }
+  reg.scanning = false; $("btnScan").disabled = false; $("regStage").classList.remove("scanning"); fx("scan", { active: false }); renderThumbs();
 }
 
-async function loadPersons() {
-  const r = await fetch("/api/persons"); const data = await r.json();
-  $("personsMsg").textContent = data.message;
-  const ul = $("persons"); ul.innerHTML = "";
-  data.persons.forEach((p) => {
-    const li = document.createElement("li");
-    const info = document.createElement("span");
-    info.innerHTML = `<strong></strong><br><small>${p.n_embeddings} embedding(s)</small>`;
-    info.querySelector("strong").textContent = p.name;
-    const del = document.createElement("button"); del.className = "danger"; del.textContent = "Excluir";
-    del.onclick = async () => {
-      if (!confirm(`Excluir ${p.name} e todos os dados associados?`)) return;
-      const res = await fetch(`/api/persons/${p.id}`, { method: "DELETE" });
-      if (res.ok) loadPersons();
-    };
-    li.append(info, del); ul.appendChild(li);
+function validateStep2() {
+  const name = $("rName").value.trim(), email = $("rEmail").value.trim(), pw = $("rPass").value;
+  if (!name) return "Informe o seu nome.";
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return "Informe um e-mail válido.";
+  if (pw.length < 8) return "A senha precisa ter pelo menos 8 caracteres.";
+  if (pw !== $("rPass2").value) return "As senhas não são iguais.";
+  return "";
+}
+
+function fillReview() {
+  const dl = $("review"); dl.replaceChildren();
+  const kind = document.querySelector('input[name="rKind"]:checked').value;
+  [["Nome", $("rName").value.trim()], ["Apartamento", $("rUnit").value.trim() || "—"], ["Tipo", KIND_LABEL[kind]],
+   ["E-mail", $("rEmail").value.trim()], ["Rosto", `${photoCount()} foto(s) escaneada(s)`]].forEach(([k, v]) => {
+    const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = k; dd.textContent = v; dl.append(dt, dd);
   });
 }
 
-$("btnStart").onclick = startCamera;
-$("btnRecognize").onclick = async () => recognize(await frameBlob());
-$("fileRecognize").onchange = (e) => { if (e.target.files[0]) recognize(e.target.files[0]); };
-$("btnCapture").onclick = async () => { captured.push(await frameBlob()); renderThumbs(); };
-$("btnClear").onclick = () => { captured = []; renderThumbs(); };
-$("btnEnroll").onclick = enroll;
-loadPersons();
+async function finishRegister() {
+  if (!$("rConsent").checked) return setMsg($("regMsg3"), "Marque a autorização para concluir o cadastro.", "warn");
+  const kind = document.querySelector('input[name="rKind"]:checked').value;
+  const fd = form({ name: $("rName").value.trim(), unit: $("rUnit").value.trim(), kind, email: $("rEmail").value.trim(), password: $("rPass").value, consent: "true" });
+  reg.shots.forEach((b, i) => fd.append("files", b, `rosto_${i}.jpg`));
+  [...$("regFiles").files].forEach((f) => fd.append("files", f, f.name));
+  setMsg($("regMsg3"), "Cadastrando…"); $("btnFinish").disabled = true;
+  const { ok, status, data } = await api("/api/auth/register", { method: "POST", body: fd });
+  $("btnFinish").disabled = false;
+  if (ok) { me = data; toast(data.message); fx("flash", { kind: "ok" }); return go("#/conta"); }
+  fx("flash", { kind: "bad" });
+  const msg = data.message || "Não foi possível concluir o cadastro.";
+  if (FACE_ERRORS.includes(data.code)) {   // problema com o rosto: volta para escanear de novo
+    reg.shots = []; $("regFiles").value = ""; renderThumbs(); setStep(1); setMsg($("regMsg1"), msg, "warn");
+  } else if (data.code === "email_in_use" || (status === 400 && /e-mail|senha/i.test(msg))) {
+    setStep(2); setMsg($("regMsg2"), msg, "warn");
+  } else setMsg($("regMsg3"), msg, status === 400 ? "warn" : "bad");
+}
+
+// ---------------------------------------------------------------- porta (simulada)
+function renderDoor(how) {
+  const leftMs = doorUntil - Date.now(), left = Math.ceil(leftMs / 1000), open = left > 0;
+  if (open !== $("door").classList.contains("open")) fx("door", { open });   // só quando muda
+  $("door").classList.toggle("open", open);
+  $("doorState").textContent = open ? "PORTA ABERTA" : "PORTA TRANCADA";
+  $("doorBar").style.width = open ? Math.max(0, Math.min(100, (leftMs / doorTotalMs) * 100)) + "%" : "0";
+  if (how !== undefined) $("door").dataset.how = how;
+  $("doorHow").textContent = open ? `${$("door").dataset.how} · tranca em ${left}s` : "Deslize ou use a câmera para abrir.";
+  if (!open && doorTimer) { clearInterval(doorTimer); doorTimer = null; }
+}
+
+function openDoor(seconds, how) {
+  doorTotalMs = Math.max(1, seconds * 1000); doorUntil = Date.now() + doorTotalMs;
+  renderDoor(how);
+  if (!doorTimer) doorTimer = setInterval(() => renderDoor(), 250);
+}
+
+function logDoor(text, kind) {
+  const ul = $("log");
+  if (ul.firstElementChild && ul.firstElementChild.classList.contains("empty")) ul.replaceChildren();
+  const li = document.createElement("li"); li.className = kind;
+  const m = document.createElement("span"); m.textContent = text;
+  const t = document.createElement("span"); t.className = "t"; t.textContent = new Date().toLocaleTimeString("pt-BR");
+  li.append(m, t); ul.prepend(li);
+  while (ul.children.length > 8) ul.lastElementChild.remove();
+}
+
+function enterDoor() {
+  $("dGreet").textContent = `Olá, ${me.name.split(" ")[0]}`;
+  paintAvatar($("dAvatar"), me);
+  const meta = $("dMeta"); meta.replaceChildren(kindBadge(me.kind)); if (me.unit) meta.append(" " + me.unit);
+  renderDoor(); loadStatus();
+}
+
+// ---- deslizar para abrir
+const slider = { drag: null, busy: false };
+function sliderMax() { return $("slider").clientWidth - $("sliderThumb").offsetWidth - 8; }
+function setThumb(x, animate) {
+  const t = $("sliderThumb"); t.style.transition = animate ? "transform .25s ease" : "none";
+  t.style.transform = `translateX(${x}px)`;
+  $("sliderFill").style.transition = animate ? "width .25s ease" : "none";
+  $("sliderFill").style.width = x > 0 ? x + t.offsetWidth + 4 + "px" : "0";
+  $("sliderLabel").style.opacity = String(Math.max(0, 1 - (x / Math.max(1, sliderMax())) * 1.6));
+}
+async function slideOpen() {
+  slider.busy = true; setThumb(sliderMax(), true);
+  const { ok, data } = await api("/api/me/door/open", { method: "POST" });
+  if (ok) {
+    openDoor(data.door_seconds, "Aberta por deslize"); logDoor("Porta aberta por deslize", "ok");
+    $("slider").classList.add("done"); $("sliderLabel").textContent = "Porta aberta"; $("sliderLabel").style.opacity = "1";
+    await sleep(1400);
+  } else if (data.code !== "not_authenticated") toast(data.message || "Não foi possível abrir a porta.");
+  $("slider").classList.remove("done"); $("sliderLabel").textContent = "Deslize para abrir";
+  setThumb(0, true); slider.busy = false;
+}
+(function initSlider() {
+  const thumb = $("sliderThumb"), el = $("slider");
+  thumb.addEventListener("pointerdown", (e) => {
+    if (slider.busy) return;
+    slider.drag = { startX: e.clientX, x: 0 }; thumb.setPointerCapture(e.pointerId);
+  });
+  thumb.addEventListener("pointermove", (e) => {
+    if (!slider.drag) return;
+    slider.drag.x = Math.max(0, Math.min(sliderMax(), e.clientX - slider.drag.startX)); setThumb(slider.drag.x, false);
+  });
+  const release = () => {
+    if (!slider.drag) return;
+    const x = slider.drag.x; slider.drag = null;
+    if (x >= sliderMax() * 0.9) slideOpen(); else setThumb(0, true);
+  };
+  thumb.addEventListener("pointerup", release);
+  thumb.addEventListener("pointercancel", () => { slider.drag = null; setThumb(0, true); });
+  // alternativa por teclado / leitor de tela
+  el.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " " || e.key === "ArrowRight") && !slider.busy) { e.preventDefault(); slideOpen(); } });
+})();
+
+// ---- abrir com o rosto (ícone da câmera)
+const unlock = { running: false };
+async function faceUnlock() {
+  if (unlock.running) return;
+  unlock.running = true;
+  const stage = $("fuStage"), msg = $("fuMsg");
+  $("faceModal").hidden = false; $("fuRetry").hidden = true; $("fuPlaceholder").hidden = false;
+  stage.className = "stage"; drawBox($("fuOverlay"), null); msg.className = ""; msg.textContent = "Ligando a câmera…";
+  try { await camera.start($("fuVideo")); }
+  catch (e) { $("fuPlaceholder").firstElementChild.textContent = "Câmera indisponível"; msg.textContent = e.message; msg.className = "warn"; $("fuRetry").hidden = false; unlock.running = false; return; }
+  $("fuPlaceholder").hidden = true; stage.classList.add("scanning"); fx("scan", { active: true });
+  msg.textContent = "Olhe para a câmera…"; msg.className = "";
+  let matched = false;
+  for (let i = 0; i < UNLOCK_TRIES && unlock.running && !matched; i++) {
+    await sleep(UNLOCK_INTERVAL_MS);
+    if (!unlock.running) break;
+    const blob = await camera.frame(); const g = $("grab");
+    const { ok, status, data } = await api("/api/me/door/face", { method: "POST", body: form({ file: blob }) });
+    if (!unlock.running) break;
+    if (ok) {
+      drawBox($("fuOverlay"), data.box, data.matched ? "Você" : "Não reconhecido", data.matched, g.width, g.height);
+      if (data.matched) {
+        matched = true; stage.className = "stage good"; msg.textContent = "Rosto reconhecido. Porta liberada!"; msg.className = "ok";
+        openDoor(data.door_seconds, "Aberta pelo rosto"); logDoor("Porta aberta pelo rosto", "ok");
+      } else { stage.className = "stage scanning bad"; msg.textContent = data.message; msg.className = "bad"; }
+    } else if (status === 422) {
+      drawBox($("fuOverlay"), null); stage.className = "stage scanning"; msg.textContent = data.message; msg.className = "warn";
+    } else { msg.textContent = data.message || "Erro ao verificar o rosto."; msg.className = "bad"; break; }
+  }
+  if (!unlock.running) return;          // cancelado pelo usuário
+  if (matched) { await sleep(1300); closeFaceModal(); return; }
+  stage.classList.remove("scanning");
+  if (msg.className !== "bad") { msg.textContent = "Não foi possível reconhecer o seu rosto. A porta continua trancada."; msg.className = "bad"; }
+  logDoor("Rosto não reconhecido: porta trancada", "bad");
+  fx("scan", { active: false }); fx("flash", { kind: "bad" });
+  $("fuRetry").hidden = false; unlock.running = false;
+}
+function closeFaceModal() { unlock.running = false; camera.stop(); $("faceModal").hidden = true; fx("scan", { active: false }); }
+
+// ---------------------------------------------------------------- perfil
+function enterProfile() {
+  paintAvatar($("pAvatar"), me);
+  $("pName").textContent = me.name;
+  const meta = $("pMeta"); meta.replaceChildren(kindBadge(me.kind), ` ${me.unit ? me.unit + " · " : ""}${me.email}`);
+  $("eName").value = me.name; $("eUnit").value = me.unit; $("eEmail").value = me.email; $("eCurrent").value = "";
+  document.querySelector(`input[name="eKind"][value="${me.kind}"]`).checked = true;
+  $("eCurrentWrap").hidden = true;
+  ["profileMsg", "pwMsg", "delMsg"].forEach((id) => setMsg($(id), ""));
+  ["wCurrent", "wNew", "wNew2"].forEach((id) => ($(id).value = ""));
+}
+
+async function saveProfile() {
+  const el = $("profileMsg");
+  const emailChanged = $("eEmail").value.trim().toLowerCase() !== me.email;
+  if (!$("eName").value.trim()) return setMsg(el, "Informe o nome.", "warn");
+  if (emailChanged && !$("eCurrent").value) { $("eCurrentWrap").hidden = false; return setMsg(el, "Informe a senha atual para trocar o e-mail.", "warn"); }
+  setMsg(el, "Salvando…");
+  const kind = document.querySelector('input[name="eKind"]:checked').value;
+  const { ok, status, data } = await api("/api/me", { method: "PUT", body: form({ name: $("eName").value.trim(), unit: $("eUnit").value.trim(), kind, email: $("eEmail").value.trim(), current_password: $("eCurrent").value }) });
+  if (!ok) { if (status === 400 && /senha atual/i.test(data.message || "")) $("eCurrentWrap").hidden = false; return setMsg(el, data.message || "Não foi possível salvar.", status === 400 || status === 409 ? "warn" : "bad"); }
+  me = data; enterProfile(); $("pillName").textContent = me.name.split(" ")[0]; paintAvatar($("pillAvatar"), me);
+  setMsg($("profileMsg"), "Dados atualizados.", "ok");
+}
+
+async function changePassword() {
+  const el = $("pwMsg"), cur = $("wCurrent").value, nw = $("wNew").value;
+  if (!cur) return setMsg(el, "Informe a senha atual.", "warn");
+  if (nw.length < 8) return setMsg(el, "A nova senha precisa ter pelo menos 8 caracteres.", "warn");
+  if (nw !== $("wNew2").value) return setMsg(el, "As senhas novas não são iguais.", "warn");
+  setMsg(el, "Alterando…");
+  const { ok, status, data } = await api("/api/me/password", { method: "POST", body: form({ current_password: cur, new_password: nw }) });
+  if (!ok) return setMsg(el, data.message || "Não foi possível alterar a senha.", status === 400 ? "warn" : "bad");
+  ["wCurrent", "wNew", "wNew2"].forEach((id) => ($(id).value = ""));
+  setMsg(el, "Senha alterada. Os outros aparelhos conectados foram desconectados.", "ok");
+}
+
+async function deleteAccount() {
+  if (!confirm("Excluir a sua conta e todos os dados do seu rosto? Isso não pode ser desfeito.")) return;
+  const { ok, data } = await api("/api/me", { method: "DELETE" });
+  if (!ok) return setMsg($("delMsg"), data.message || "Não foi possível excluir a conta.", "bad");
+  me = null; doorUntil = 0; renderDoor(); toast("Conta excluída: cadastro e embeddings removidos."); go("#/");
+}
+
+// ---------------------------------------------------------------- eventos
+document.addEventListener("click", (e) => { const t = e.target.closest("[data-go]"); if (t) { e.preventDefault(); go(t.dataset.go); } });
+$("brandBtn").onclick = () => go(me ? "#/conta" : "#/");
+// passar o mouse (ou focar pelo teclado) num botão entreabre a folha dele na porta 3D
+for (const [id, side] of [["goLogin", "l"], ["goRegister", "r"]]) {
+  const b = $(id), on = () => fx("hover", { side }), off = () => fx("hover", { side: null });
+  b.addEventListener("pointerenter", on); b.addEventListener("pointerleave", off);
+  b.addEventListener("focus", on); b.addEventListener("blur", off);
+}
+// a palavra gigante se move um pouco ao contrário do ponteiro: dá profundidade à cena
+window.addEventListener("pointermove", (e) => {
+  if (currentView !== "home" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const w = document.querySelector(".bigword");
+  w.style.setProperty("--px", (-(e.clientX / innerWidth - 0.5) * 28).toFixed(1) + "px");
+  w.style.setProperty("--py", (-(e.clientY / innerHeight - 0.5) * 14).toFixed(1) + "px");
+}, { passive: true });
+$("goLogin").onclick = () => enterThrough("#/entrar");
+$("goRegister").onclick = () => enterThrough("#/cadastro");
+// links do topo: no início também atravessam a porta; nas outras telas trocam direto
+for (const [id, hash] of [["navLogin", "#/entrar"], ["navRegister", "#/cadastro"]]) {
+  $(id).onclick = (e) => { e.preventDefault(); currentView === "home" ? enterThrough(hash) : go(hash); };
+}
+$("loginForm").onsubmit = doLogin;
+$("btnLogout").onclick = doLogout; $("btnLogout2").onclick = doLogout;
+$("userPill").onclick = () => go("#/perfil");
+$("btnScan").onclick = scanFace;
+$("regFiles").onchange = renderThumbs;
+$("btnRegClear").onclick = () => { reg.shots = []; $("regFiles").value = ""; renderThumbs(); };
+$("btnNext1").onclick = () => { setMsg($("regMsg1"), ""); setStep(2); };
+$("btnBack2").onclick = () => setStep(1);
+$("btnNext2").onclick = () => { const err = validateStep2(); if (err) return setMsg($("regMsg2"), err, "warn"); setMsg($("regMsg2"), ""); setStep(3); };
+$("btnBack3").onclick = () => setStep(2);
+$("btnFinish").onclick = finishRegister;
+$("btnCam").onclick = faceUnlock; $("fuRetry").onclick = faceUnlock; $("fuClose").onclick = closeFaceModal;
+$("faceModal").addEventListener("click", (e) => { if (e.target === $("faceModal")) closeFaceModal(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("faceModal").hidden) closeFaceModal(); });
+$("eEmail").oninput = () => { $("eCurrentWrap").hidden = $("eEmail").value.trim().toLowerCase() === me.email; };
+$("btnSaveProfile").onclick = saveProfile;
+$("btnChangePw").onclick = changePassword;
+$("btnDelete").onclick = deleteAccount;
+window.addEventListener("hashchange", render);
+window.addEventListener("resize", () => { drawBox($("fuOverlay"), null); drawBox($("regOverlay"), null); });
+
+// início: descobre se já existe sessão (cookie) antes de escolher a tela
+(async function boot() {
+  const ready = { status: false, fonts: false, scene: false };
+  runIntro(ready);
+  loadStatus().finally(() => (ready.status = true));
+  (document.fonts ? document.fonts.ready : Promise.resolve()).finally(() => (ready.fonts = true));
+  const r = await api("/api/me");
+  if (r.ok) me = r.data;
+  render();
+})();
+
+// Tela de carregamento: a porcentagem segue o que já carregou (configuração, fontes, cena 3D),
+// dura pelo menos ~1,3 s para ser lida e no máximo ~4 s, mesmo que algo falhe.
+function runIntro(ready) {
+  const box = $("intro");
+  if (box.hidden) return;
+  const t0 = performance.now(); let shown = 0, last = t0;
+  const sceneReady = () => !!window.__portariaScene || !document.getElementById("bg3d");
+  function frame(now) {
+    const el = now - t0, dt = Math.min(1, (now - last) / 1000); last = now;   // por tempo, não por quadro
+    if (!ready.scene && (sceneReady() || el > 3000)) ready.scene = true;
+    let target = 12 + (ready.status ? 30 : 0) + (ready.fonts ? 20 : 0) + (ready.scene ? 38 : 0);
+    if (el > 4000) target = 100;
+    target = Math.min(target, (el / 1300) * 100);   // nunca rápido demais para ler
+    shown += Math.max(dt * 15, (target - shown) * (1 - Math.exp(-dt * 6)));
+    shown = Math.min(shown, target);
+    const n = Math.round(shown);
+    $("introNum").textContent = n; $("introNum2").textContent = n;
+    $("introBar").style.width = n + "%";
+    $("introLabel").textContent = n < 40 ? "Carregando" : n < 80 ? "Preparando a porta" : "Quase lá";
+    if (n < 100) return requestAnimationFrame(frame);
+    setTimeout(() => {
+      box.classList.add("out"); document.body.classList.remove("intro");
+      setTimeout(() => (box.hidden = true), 950);
+    }, 250);
+  }
+  requestAnimationFrame(frame);
+}
 </script>
+<!-- Fundo 3D: módulo separado e opcional. Se falhar (sem WebGL, arquivo ausente), o app segue normal. -->
+<script type="module" src="/static/scene.js"></script>
 </body>
 </html>
