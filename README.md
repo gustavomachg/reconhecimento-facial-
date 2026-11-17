@@ -16,9 +16,13 @@ Imagem → Detecção (MTCNN) → Alinhamento → Rede neural → Embedding (L2)
 Metodologia: **Spec-Driven Development** — specs em [`docs/specs/`](docs/specs), decisões em
 [`docs/decisions/`](docs/decisions), privacidade em [`docs/privacy.md`](docs/privacy.md).
 
-**Parte 1 (foco atual):** protocolo de cada experimento em [`docs/experiments.md`](docs/experiments.md),
-rastreabilidade enunciado → código em [`docs/parte1_checklist.md`](docs/parte1_checklist.md) e
-roteiro do vídeo em [`docs/video_parte1.md`](docs/video_parte1.md).
+**Parte 1:** protocolo de cada experimento em [`docs/experiments.md`](docs/experiments.md) e
+rastreabilidade enunciado → código em [`docs/parte1_checklist.md`](docs/parte1_checklist.md).
+
+**Parte 2:** aplicação com o modelo vencedor da Parte 1 (**MobileFaceNet, E08**; ver
+[ADR-001](docs/decisions/ADR-001-face-model.md)). Rastreabilidade em
+[`docs/parte2_checklist.md`](docs/parte2_checklist.md) e roteiro do vídeo em
+[`docs/video_parte2.md`](docs/video_parte2.md). Como rodar: seção [Aplicação (Parte 2)](#aplicação-parte-2).
 
 ---
 
@@ -342,24 +346,89 @@ todos atingiram AUC 1,0).
 - O pré-treino (VGGFace2, WebFace600K) pode conter identidades do LFW — não controlável; o LFW
   serve como referência externa, não como critério de escolha.
 - Sem anti-spoofing: uma foto da pessoa na tela pode ser reconhecida.
+- Contas: sem recuperação de senha, verificação de e-mail ou administrador (ADR-005).
+- Uma face por imagem/quadro: com duas pessoas na câmera, a aplicação pede que fique só uma.
 - Os modelos ArcFace (iResNet-50 e MobileFaceNet) são usados congelados (ONNX); apenas a FaceNet é fine-tunada.
 - Viés demográfico dos datasets públicos (celebridades) pode afetar o desempenho.
 
 ## Aplicação (Parte 2)
 
 ```bash
-uvicorn facerec.app.main:app --reload     # http://127.0.0.1:8000
+python scripts/download_arcface.py --pack buffalo_s   # 1x: baixa o modelo vencedor (MobileFaceNet)
+uvicorn facerec.app.main:app                          # http://127.0.0.1:8000
 ```
 
-Configuração em [`configs/app.yaml`](configs/app.yaml) — modelo, matcher, threshold, caminhos, device.
-Estado inicial após clonar: **"Nenhuma pessoa cadastrada."**
+Configuração em [`configs/app.yaml`](configs/app.yaml) — modelo, matcher, threshold, porta, sessão,
+caminhos, device. Estado inicial após clonar: **"Nenhuma pessoa cadastrada."**
+
+A aplicação é um app de **portaria de condomínio**. Fluxo:
+
+```
+Início ──▶ Entrar (e-mail + senha) ─────────────────────────────────┐
+   │                                                                ▼
+   └────▶ Cadastrar-se: 1 escanear o rosto ─▶ 2 dados ─▶ 3 confirmar ─▶ Conta
+                                                                    ├─ Porta: deslizar o dedo  ou  ícone de câmera (rosto)
+                                                                    └─ Usuário: dados pessoais · senha · excluir conta
+```
+
+**Modelo:** MobileFaceNet (ArcFace loss, E08), escolhido na Parte 1 pelos critérios do
+[ADR-001](docs/decisions/ADR-001-face-model.md): empata com o iResNet-50 no LFW (EER 0,32% × 0,30%),
+supera a FaceNet e é ~18× mais rápido (5 ms/face), o que permite o reconhecimento pela câmera em CPU.
+O rodapé da página mostra o modelo, o comparador e o threshold em uso.
+**Threshold:** provisório (0,25) a partir do EER do E08 no LFW, até o E07 rodar no dataset do grupo
+([ADR-003](docs/decisions/ADR-003-recognition-threshold.md)).
+
+```
+navegador (index.html) ──HTTP──▶ app/main.py (FastAPI: rotas, sessão por cookie, erros → 4xx/5xx)
+                                     │
+                                     ▼
+              service.py (enroll · authenticate · verify_face · open_door · update · delete)
+             ╱          │              │             │             ╲
+   detection.py   models/ (ONNX)   matching.py    auth.py        storage.py (SQLite)
+   MTCNN+alinham. MobileFaceNet    protótipo      PBKDF2,        UUID, cascade,
+                                                  sessões        secure_delete
+```
 
 | Funcionalidade | Spec | Comportamento |
 |---|---|---|
-| Cadastro | [002](docs/specs/002-person-enrollment.md) | nome + fotos (webcam ou arquivo); rejeita sem face, várias faces, baixa qualidade, fotos inconsistentes e duplicatas |
-| Reconhecimento | [003](docs/specs/003-face-recognition.md) / [004](docs/specs/004-unknown-person.md) | "Pessoa reconhecida: X (score)" ou "Pessoa desconhecida" |
-| Exclusão | [006](docs/specs/006-person-deletion.md) | remove pessoa, embeddings e fotos; `secure_delete` + `VACUUM` |
-| Interface | [005](docs/specs/005-camera-interface.md) | web local com webcam |
+| Cadastro | [002](docs/specs/002-person-enrollment.md) | rosto escaneado (ou fotos) + dados; rejeita sem face, várias faces, baixa qualidade, fotos inconsistentes e rosto já cadastrado |
+| Reconhecimento | [003](docs/specs/003-face-recognition.md) / [004](docs/specs/004-unknown-person.md) | identificação 1:N com threshold; só abre a porta se o rosto for o do dono da conta; senão "não corresponde à sua conta" ou "Pessoa não cadastrada" |
+| Exclusão | [006](docs/specs/006-person-deletion.md) | cada pessoa exclui a própria conta: cadastro, e-mail, senha, embeddings e fotos; `secure_delete` + `VACUUM` |
+| Interface | [005](docs/specs/005-camera-interface.md) | web local com webcam, um arquivo só, sem recursos de terceiros; funciona no celular |
+| Vídeo | [007](docs/specs/007-live-video-recognition.md) | "Abrir com o rosto": envia quadros da câmera em sequência até reconhecer, com a caixa desenhada sobre o vídeo |
+| Portaria | [008](docs/specs/008-condominium-gate.md) | morador ou visitante; a porta (simulada) abre de duas formas — **deslizando** ou **pelo rosto** |
+| Visual | [010](docs/specs/010-motion-and-3d.md) | página de abertura editorial: palavra gigante "PORTARIA", porta só de contorno (three.js) com um botão em cada folha, que abre ao clicar; selos amarelos de estado. Opcional e desligado com "reduzir movimento" |
+| Contas | [009](docs/specs/009-accounts-and-login.md) | Entrar / Cadastrar-se em 3 etapas, página do usuário, edição de dados e senha — decisões de segurança no [ADR-005](docs/decisions/ADR-005-accounts-and-sessions.md) |
+
+**Bibliotecas de terceiros na interface:** [three.js](https://threejs.org) r160 (licença MIT) e a fonte
+[Playfair Display](https://github.com/clauseggers/Playfair-Display) (licença SIL OFL), copiadas em
+`src/facerec/app/static/vendor/` com as respectivas licenças e servidas localmente — a página não
+carrega nada de outros hosts.
+
+**Segurança e privacidade da conta:** senha guardada só como hash (PBKDF2-SHA256, 600 mil iterações);
+sessão em cookie `HttpOnly` + `SameSite=Strict`; bloqueio após 5 senhas erradas; cada pessoa só vê e
+altera os próprios dados (não existe rota que liste pessoas); e-mail, senha e nome nunca vão para logs.
+O banco local (`embeddings/facerec.db`, fora do git) passa a conter e-mails e hashes: é dado privado.
+
+### Acessar de outro computador (ex.: notebook com câmera)
+
+O navegador só libera a câmera em `localhost` ou em **HTTPS**. Para rodar a aplicação num PC e usar
+a câmera de um notebook na **mesma rede doméstica**, sirva-a com um certificado autoassinado:
+
+```bash
+# 1x: gerar o certificado com o IP do PC (ipconfig mostra o IPv4); certs/ fica fora do git
+openssl req -x509 -newkey rsa:2048 -nodes -days 120 -keyout certs/key.pem -out certs/cert.pem \
+  -subj "/CN=reconhecedor-facial-local" -addext "subjectAltName=IP:<IP_DO_PC>,IP:127.0.0.1,DNS:localhost"
+
+uvicorn facerec.app.main:app --host 0.0.0.0 --port 8443 \
+  --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
+```
+
+No notebook, abra `https://<IP_DO_PC>:8443` e aceite o aviso de certificado (é o seu próprio).
+No Windows, o `openssl` vem com o Git (`C:\Program Files\Git\usr\bin\openssl.exe`).
+Sem HTTPS, senha e imagens trafegariam em claro pela rede: fora do `localhost`, use sempre este
+modo. Mesmo com login, o cadastro é aberto a quem alcançar o endereço: use só em rede doméstica e
+encerre o servidor (Ctrl+C) depois.
 
 ## Testes
 

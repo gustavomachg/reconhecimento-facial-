@@ -10,6 +10,8 @@ sempre por threshold sobre o score do melhor candidato.
 
 ## Requisitos
 1. Se `score < threshold` → **"Pessoa desconhecida"**, sem revelar o candidato mais próximo.
+   Na aplicação a mensagem é "Pessoa não cadastrada. A porta continua trancada."
+   (`reason=unknown`, spec 008).
 2. O threshold é escolhido **somente na validação** (E07), por EER ou FAR-alvo; o teste é usado
    uma única vez para reportar FAR/FRR finais (ADR-003, ADR-004).
 3. Desconhecidos de validação e de teste são pessoas diferentes entre si e nunca estão na galeria.

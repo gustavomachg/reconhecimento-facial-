@@ -1,0 +1,25 @@
+# Parte 2 — rastreabilidade enunciado → repositório
+
+| § do enunciado | Exigência | Onde está |
+|---|---|---|
+| 36 | aplicação usa a melhor configuração da Parte 1 (ou justifica) | modelo **MobileFaceNet (E08)** em [`configs/app.yaml`](../configs/app.yaml), justificado no [ADR-001](decisions/ADR-001-face-model.md); exibido no rodapé da página (`GET /api/status`); garantido por `tests/test_privacy_and_config.py::test_app_uses_part1_winner` |
+| 36 | threshold vindo dos experimentos | [ADR-003](decisions/ADR-003-recognition-threshold.md): ponto de partida no EER do E08 (LFW), valor final do E07 no dataset do grupo |
+| 37 | cadastro: imagem → detecção → alinhamento → embedding → cadastro | [spec 002](specs/002-person-enrollment.md) e cadastro em 3 etapas da [spec 009](specs/009-accounts-and-login.md); `FaceRecognitionService.enroll` em [`service.py`](../src/facerec/service.py) |
+| 37 | nenhuma face / múltiplas faces / imagem inadequada / duplicado | `NoFaceDetected`, `MultipleFacesDetected`, `LowQualityImage` (tamanho, nitidez), `InvalidImage`, `DuplicatePerson` (rosto), `EmailAlreadyRegistered` (e-mail), `InconsistentEnrollment` — [`exceptions.py`](../src/facerec/exceptions.py); testes `test_enroll_errors`, `test_register_face_errors_are_422_and_save_nothing`, `test_duplicate_face_is_422_and_does_not_reveal_who`, `test_duplicate_email_is_409` |
+| 38 | reconhecimento por **imagem ou vídeo** → detecção → embedding → comparação → threshold → reconhecido/desconhecido | "Abrir com o rosto" envia quadros da câmera em sequência ([spec 007](specs/007-live-video-recognition.md)); identificação 1:N com threshold ([spec 003](specs/003-face-recognition.md), [004](specs/004-unknown-person.md)); reconhecido → porta liberada, desconhecido → "Pessoa não cadastrada" |
+| 39 | exclusão: cadastro, embedding, fotos e outros dados | [spec 006](specs/006-person-deletion.md): "Excluir minha conta" (`DELETE /api/me`) remove cadastro, e-mail, hash da senha, embeddings e fotos (cascade, `secure_delete`, `VACUUM`) e encerra as sessões; testes em `tests/test_storage.py`, `tests/test_service.py`, `test_delete_account_removes_everything` |
+| 40 | interface (web, desktop…) com imagem da câmera e resultado | app web de **portaria de condomínio**: Entrar / Cadastrar-se, porta aberta por deslize ou pelo rosto, página do usuário — specs [005](specs/005-camera-interface.md), [008](specs/008-condominium-gate.md), [009](specs/009-accounts-and-login.md); [`index.html`](../src/facerec/app/static/index.html); página de abertura editorial com porta 3D de contorno que abre ao clicar (three.js local, opcional) — [spec 010](specs/010-motion-and-3d.md) |
+| 41 | separação de responsabilidades, modularização | detecção (`detection.py`) · modelo (`models/`) · comparação (`matching.py`) · autenticação (`auth.py`) · persistência (`storage.py`) · casos de uso (`service.py`) · HTTP (`app/main.py`) · interface (`static/`) |
+| 41 | testes | `pytest` (todos com dados sintéticos); CI em Linux e Windows ([`ci.yml`](../.github/workflows/ci.yml)) |
+| 41 | tratamento de erros | exceções de domínio com código HTTP próprio: 400 validação · 401 sessão/credenciais · 404 · 409 e-mail em uso · 413 arquivo grande · 422 rosto · 429 tentativas · 500 JSON; todas mostradas na página |
+| 41 | logs | [`logging_utils.py`](../src/facerec/logging_utils.py): eventos estruturados com UUID opaco, score e latência — **sem nome, e-mail, senha nem imagem** (`test_logs_never_contain_email_password_or_name`) |
+| 41 | configuração externa | [`configs/app.yaml`](../configs/app.yaml) (ou `FACEREC_CONFIG`): modelo, threshold, porta, sessão, bloqueio de login |
+| 41 | ambiente reproduzível | `.python-version`, `requirements.txt`, `pyproject.toml`, instruções de instalação no README; autenticação só com a biblioteca padrão (sem dependência nova) |
+| 41 | especificações e critérios de aceitação | [`docs/specs/`](specs) 001–010, cada uma com tabela de critérios de aceitação |
+| 41 | decisões explícitas | [`docs/decisions/`](decisions) ADR-001 a ADR-005 |
+| 41 | revisão de código | pull request por funcionalidade (ex.: branch `parte2-aplicacao`), CI obrigatório, `ruff` e hook de pre-commit |
+| 42 | vídeo: inicialização, cadastro, reconhecimento, desconhecido, erro, arquitetura — sem terceiros | roteiro em [`docs/video_parte2.md`](video_parte2.md) |
+| 43 | quem clona encontra "Nenhuma pessoa cadastrada." | banco em `embeddings/` (ignorado pelo git); página de início e `GET /api/status`; testes `test_initial_state`, `test_initial_state_message` |
+| 14 | consentimento antes de cadastrar | autorização obrigatória na etapa 3 do cadastro; a API recusa sem `consent=true` (`test_register_requires_consent`) |
+| 17–20 | dados privados fora do GitHub | o banco agora também guarda e-mails e hashes de senha: continua em `embeddings/` (ignorado e bloqueado pelo hook); certificados HTTPS em `certs/` (ignorado) |
+| 13–25 | LGPD continua valendo na aplicação | processamento só local; fotos **não** guardadas por padrão; quadros só em memória; cada pessoa acessa apenas os próprios dados; [`docs/privacy.md`](privacy.md), [ADR-005](decisions/ADR-005-accounts-and-sessions.md) |

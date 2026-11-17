@@ -29,8 +29,11 @@ class ArcFaceEmbedder(Embedder):
 
         path = Path(model_path)
         if not path.exists():
+            pack = path.parent.name if path.parent.name.startswith("buffalo_") else "buffalo_l"
+            flag = "" if pack == "buffalo_l" else f" --pack {pack}"
             raise FileNotFoundError(
-                f"Modelo ArcFace não encontrado em {path}. Rode: python scripts/download_arcface.py"
+                f"Modelo ArcFace não encontrado em {path}. "
+                f"Rode: python scripts/download_arcface.py{flag}"
             )
         providers = ["CPUExecutionProvider"]
         if device.startswith("cuda") and "CUDAExecutionProvider" in ort.get_available_providers():
