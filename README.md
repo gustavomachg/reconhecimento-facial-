@@ -437,6 +437,17 @@ ruff check . && ruff format --check .
 python scripts/check_private_files.py --history   # nenhum dado privado no histórico do git
 ```
 
+## Esvaziar os cadastros da aplicação
+
+Apaga todas as contas (nome, e-mail, senha e embeddings) do banco da aplicação, com a mesma
+rotina da exclusão de conta. Depois disso o início volta a mostrar "Nenhuma pessoa cadastrada.".
+Não mexe em `data/private/`, `pessoas/` nem nos modelos.
+
+```bash
+python scripts/clear_people.py          # simulação: só conta
+python scripts/clear_people.py --yes    # apaga
+```
+
 ## Eliminação dos dados ao fim da disciplina
 
 ```bash
