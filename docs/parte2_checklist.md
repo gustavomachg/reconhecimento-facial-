@@ -18,7 +18,7 @@
 | 41 | especificações e critérios de aceitação | [`docs/specs/`](specs) 001–010, cada uma com tabela de critérios de aceitação |
 | 41 | decisões explícitas | [`docs/decisions/`](decisions) ADR-001 a ADR-005 |
 | 41 | revisão de código | pull request por funcionalidade (ex.: branch `parte2-aplicacao`), CI obrigatório, `ruff` e hook de pre-commit |
-| 42 | vídeo: inicialização, cadastro, reconhecimento, desconhecido, erro, arquitetura — sem terceiros | roteiro em [`docs/video_parte2.md`](video_parte2.md) |
+| 42 | vídeo: inicialização, cadastro, reconhecimento, desconhecido, erro, arquitetura — sem terceiros | vídeo gravado e entregue à parte (fora do repositório) |
 | 43 | quem clona encontra "Nenhuma pessoa cadastrada." | banco em `embeddings/` (ignorado pelo git); página de início e `GET /api/status`; testes `test_initial_state`, `test_initial_state_message` |
 | 14 | consentimento antes de cadastrar | autorização obrigatória na etapa 3 do cadastro; a API recusa sem `consent=true` (`test_register_requires_consent`) |
 | 17–20 | dados privados fora do GitHub | o banco agora também guarda e-mails e hashes de senha: continua em `embeddings/` (ignorado e bloqueado pelo hook); certificados HTTPS em `certs/` (ignorado) |

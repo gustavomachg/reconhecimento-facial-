@@ -24,4 +24,4 @@
 | 32 | threshold reconhecido/desconhecido justificado experimentalmente | E07, [ADR-003](decisions/ADR-003-recognition-threshold.md) |
 | 33 | análise (melhor modelo, por quê, fine-tuning, threshold, erros, limitações, custo) | seção "Análise" do README (a preencher com os resultados) |
 | 34 | seed, versões, hiperparâmetros, arquitetura, épocas, optimizer, LR, batch, transforms, hardware | YAMLs + `environment` em `metrics.json`/`train_summary.json` |
-| 35 | README com tabela, instruções de reprodução, vídeo | README; `python -m facerec.report`; [`docs/video_parte1.md`](video_parte1.md) |
+| 35 | README com tabela, instruções de reprodução, vídeo | README; `python -m facerec.report`; vídeo entregue à parte (fora do repositório) |

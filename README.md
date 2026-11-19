@@ -21,8 +21,7 @@ rastreabilidade enunciado → código em [`docs/parte1_checklist.md`](docs/parte
 
 **Parte 2:** aplicação com o modelo vencedor da Parte 1 (**MobileFaceNet, E08**; ver
 [ADR-001](docs/decisions/ADR-001-face-model.md)). Rastreabilidade em
-[`docs/parte2_checklist.md`](docs/parte2_checklist.md) e roteiro do vídeo em
-[`docs/video_parte2.md`](docs/video_parte2.md). Como rodar: seção [Aplicação (Parte 2)](#aplicação-parte-2).
+[`docs/parte2_checklist.md`](docs/parte2_checklist.md). Como rodar: seção [Aplicação (Parte 2)](#aplicação-parte-2).
 
 ---
 
