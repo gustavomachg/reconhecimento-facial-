@@ -421,7 +421,7 @@ def test_intro_screen_is_optional_and_shown_once(client):
     html = client.get("/").text
     assert '<div id="intro" aria-hidden="true" hidden>' in html  # sem JS, não aparece
     assert 'sessionStorage.getItem("portaria:intro")' in html
-    assert "prefers-reduced-motion: reduce)\").matches) return;" in html
+    assert 'prefers-reduced-motion: reduce)").matches) return;' in html
     assert "if (el > 4000) target = 100;" in html  # termina mesmo se algo não carregar
 
 
