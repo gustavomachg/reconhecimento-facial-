@@ -1,6 +1,7 @@
 # Spec 006 — Exclusão de pessoa
 
-**Status:** implementada · **Módulos:** `storage.py` (`delete_person`), `service.py` (`delete`)
+**Status:** implementada · **Módulos:** `storage.py` (`delete_person`), `service.py` (`delete`),
+`app/main.py` (`DELETE /api/me`)
 **Testes:** `tests/test_storage.py::test_delete_removes_person_embeddings_and_photos`,
 `tests/test_storage.py::test_deleted_bytes_not_left_in_db_file`,
 `tests/test_service.py::test_delete_removes_everything_and_person_becomes_unknown`
@@ -16,6 +17,9 @@ Direito do titular à eliminação (LGPD art. 18, VI). A exclusão precisa ser *
 4. Invalidar o cache do matcher: a pessoa passa a ser "desconhecida" imediatamente.
 5. ID inexistente → `PersonNotFound` (404).
 6. Log `delete_ok` apenas com o UUID.
+7. Na aplicação, **cada pessoa exclui a própria conta** (aba Usuário → "Excluir minha conta",
+   `DELETE /api/me`, com confirmação). Junto com o rosto somem o e-mail e o hash da senha, e
+   todas as sessões da pessoa são encerradas. Ninguém consegue excluir a conta de outro.
 
 ## Critérios de aceitação
 | # | Dado | Quando | Então |
@@ -26,6 +30,8 @@ Direito do titular à eliminação (LGPD art. 18, VI). A exclusão precisa ser *
 | CA4 | "A" excluída | reconhecer foto de "A" | "Pessoa desconhecida" |
 | CA5 | "B" cadastrada | excluir "A" | "B" intacta |
 | CA6 | id inexistente | excluir | 404 |
+| CA7 | conta logada em 2 navegadores | excluir a conta em um | os dois são desconectados; login deixa de funcionar |
+| CA8 | conta excluída | cadastrar de novo com o mesmo e-mail e rosto | 201 (nada ficou para trás) |
 
 ## Eliminação total
 Ao fim da disciplina: `python scripts/purge_private_data.py --yes` (ver `docs/privacy.md`).

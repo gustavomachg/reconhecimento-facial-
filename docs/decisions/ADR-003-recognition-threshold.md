@@ -19,8 +19,20 @@ rejeitadas (FRR alto, falha de usabilidade).
 _A preencher após o E07:_ modelo `____` + matcher `____`, estratégia `____`,
 threshold = `____`; no teste: FAR desconhecidos = `____`, FRR conhecidos = `____`.
 
-Valor provisório em `configs/app.yaml`: `0.55` (cosseno/protótipo FaceNet) — **apenas** para a
-aplicação funcionar antes dos experimentos; não é resultado experimental.
+Valor provisório em `configs/app.yaml`: **`0.25`** (MobileFaceNet + protótipo). Ponto de partida:
+o threshold de EER do E08 no LFW (0,206; FAR 0,27% / FRR 0,40%), arredondado para cima para
+priorizar a rejeição de desconhecidos (a aplicação prefere dizer "Pessoa desconhecida" a confundir
+pessoas). Ele vem de um benchmark público e de pares foto × foto, não do domínio da aplicação
+nem do matcher protótipo. Por isso continua **provisório** até o E07.
+`duplicate_threshold` (0,60) e `consistency_threshold` (0,20) seguem a mesma escala e também
+devem ser revistos com o histograma de scores do E07.
+
+Para fechar esta decisão (no computador do grupo, dados privados nunca saem da máquina):
+```bash
+python -m facerec.compare_matchers --config configs/experiments/E06_matchers_open_set.yaml
+python -m facerec.threshold        --config configs/experiments/E07_threshold_sweep.yaml
+```
+Copiar para cá apenas os valores **agregados** de `experiments/results/E07/metrics.json`.
 
 ## Consequências
 Trocar de modelo ou matcher exige rodar o E07 de novo.

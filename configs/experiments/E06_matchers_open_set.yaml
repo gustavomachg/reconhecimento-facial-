@@ -12,11 +12,12 @@ seed: 42
 device: auto
 
 model:
-  name: facenet            # trocar pelo vencedor (ex.: arcface)
+  name: arcface            # vencedor da Parte 1: MobileFaceNet (E08, ADR-001)
+  path: checkpoints/public/buffalo_s/w600k_mbf.onnx
   # checkpoint: checkpoints/finetuned/E04.pt   # se o vencedor for um modelo fine-tunado
 
 private:
-  aligned_root: data/private/aligned_facenet   # aligned_arcface se o modelo for arcface
+  aligned_root: data/private/aligned_arcface   # alinhamento de 5 pontos (112x112) do ArcFace
   gallery_sessions: [s1]
   val_sessions: [s2]
   test_sessions: [s3]

@@ -9,7 +9,8 @@ Este documento registra as medidas adotadas no trabalho.
 - Participantes: **apenas adultos**, com termo de consentimento assinado.
 - Os termos ficam **fora do repositório** (`consent/` está no `.gitignore` e bloqueado pelo hook).
 - O participante pode revogar o consentimento a qualquer momento: seus dados são removidos
-  (`DELETE /api/persons/{id}` na aplicação e remoção da pasta `data/private/raw/<ID>`).
+  (na aplicação, a própria pessoa usa "Excluir minha conta" — `DELETE /api/me`; no dataset,
+  remoção da pasta `data/private/raw/<ID>`).
 
 ## Minimização
 - Coletar só o necessário: ~5–10 fotos por sessão, 3 sessões por pessoa, com variações de
@@ -17,10 +18,24 @@ Este documento registra as medidas adotadas no trabalho.
 - Pastas identificadas por **código opaco** (`P01`, `P02`…), nunca pelo nome. Nomes de arquivo
   também não devem conter nomes (renomear fotos de celular como `IMG_xxx` → `001.jpg`).
 - A aplicação **não guarda fotos** por padrão (`store_photos: false`); guarda só embeddings.
+- O cadastro na aplicação exige a confirmação de que a pessoa (morador ou visitante) consentiu (`consent`); o **termo
+  assinado** fica com o grupo, fora do sistema e do GitHub. Nome e apartamento também são dados
+  pessoais: não aparecem em logs. Quem não está cadastrado não é identificado nem registrado. A abertura da porta gera só
+  um log de auditoria com a forma (rosto/botão) e o UUID, sem nome.
+- **Contas (spec 009, ADR-005):** cada pessoa se cadastra e consente no próprio cadastro. O e-mail
+  é dado pessoal; a senha é guardada só como **hash** (PBKDF2). Ficam no mesmo banco local dos
+  embeddings (`embeddings/facerec.db`, ignorado pelo git) e são apagados junto com a conta.
+  Cada pessoa só acessa os próprios dados: não há rota que liste pessoas, e a porta pelo rosto
+  nunca revela de quem é um rosto diferente do dono da conta.
+- No reconhecimento (foto ou contínuo pela câmera), cada quadro só existe na memória durante a
+  requisição: nada é gravado em disco nem em log (só UUID, score e latência).
 
 ## Segurança
 - Todo processamento é **local**; nenhuma imagem/embedding é enviado a serviços externos.
-  A aplicação escuta apenas em `127.0.0.1`.
+  A aplicação escuta apenas em `127.0.0.1` por padrão. Para usar a câmera de outro computador da
+  **mesma rede doméstica**, ela pode ser exposta na rede local só com **HTTPS** (imagens
+  criptografadas no caminho) e só durante o uso — ver "Acessar de outro computador" no README.
+  Nunca expor em rede pública (faculdade, café): o cadastro é aberto a quem alcançar o endereço.
 - `.gitignore` + hook de pre-commit `scripts/check_private_files.py` bloqueiam fotos, vídeos,
   bancos, embeddings, checkpoints e termos.
 - Logs estruturados com **UUID opaco**; `log_event` recusa campos como `name`, `image`, `embedding`.
